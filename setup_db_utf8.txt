@@ -1,0 +1,4 @@
+﻿โมเดล import OK
+Drop tables OK
+Create tables OK
+App import OK — พร้อมรัน uvicorn

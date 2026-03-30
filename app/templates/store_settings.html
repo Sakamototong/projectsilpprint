@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}ตั้งค่าร้านค้า – SilpPrint{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4">
+  <h5 class="mb-0 fw-bold">
+    <i class="bi bi-gear-fill me-2 text-primary"></i>ตั้งค่าร้านค้า
+  </h5>
+</div>
+
+{% if request.query_params.get('saved') %}
+<div class="alert alert-success py-2">
+  <i class="bi bi-check-circle-fill me-2"></i>บันทึกเรียบร้อยแล้ว
+  <button type="button" class="btn-close float-end" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if request.query_params.get('staff_added') %}
+<div class="alert alert-success py-2">
+  <i class="bi bi-person-check-fill me-2"></i>เพิ่มผู้ใช้งานเรียบร้อยแล้ว
+  <button type="button" class="btn-close float-end" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if staff_error %}
+<div class="alert alert-danger py-2">
+  <i class="bi bi-exclamation-circle me-2"></i>{{ staff_error }}
+</div>
+{% endif %}
+
+<div class="row g-4">
+  <!-- ข้อมูลร้านค้า -->
+  <div class="col-lg-6">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3 text-muted text-uppercase small">
+        <i class="bi bi-shop me-1"></i>ข้อมูลร้านค้า / ออกใบเสร็จ
+      </h6>
+      <form method="post" action="/web/settings/profile">
+        <div class="mb-3">
+          <label class="form-label small fw-bold">ชื่อร้าน / บริษัท <span class="text-danger">*</span></label>
+          <input type="text" name="store_name" class="form-control form-control-sm"
+                 value="{{ store.name }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">ที่อยู่</label>
+          <textarea name="address" class="form-control form-control-sm" rows="3"
+                    placeholder="เลขที่ ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด รหัสไปรษณีย์">{{ store.address or '' }}</textarea>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label small fw-bold">เลขประจำตัวผู้เสียภาษี</label>
+            <input type="text" name="tax_id" class="form-control form-control-sm"
+                   value="{{ store.tax_id or '' }}" placeholder="0-0000-00000-00-0">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label small fw-bold">เบอร์โทร</label>
+            <input type="text" name="phone" class="form-control form-control-sm"
+                   value="{{ store.phone or '' }}" placeholder="02-xxx-xxxx">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">อีเมล</label>
+          <input type="email" name="email" class="form-control form-control-sm"
+                 value="{{ store.email or '' }}" placeholder="store@email.com">
+        </div>
+
+        <hr>
+        <h6 class="fw-bold mb-3 text-muted text-uppercase small"><i class="bi bi-percent me-1"></i>การตั้งค่า VAT</h6>
+        <div class="row g-2 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label small fw-bold">อัตรา VAT (%)</label>
+            <input type="number" name="vat_rate" class="form-control form-control-sm"
+                   value="{{ store.vat_rate or 7 }}" min="0" max="100" step="0.01">
+          </div>
+          <div class="col-sm-6 d-flex align-items-end pb-1">
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" name="include_vat" value="1"
+                     id="includeVat" {% if store.include_vat %}checked{% endif %}>
+              <label class="form-check-label small" for="includeVat">เปิดใช้ VAT ตั้งต้น</label>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-save me-1"></i>บันทึกข้อมูลร้าน
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- จัดการผู้ใช้งาน -->
+  <div class="col-lg-6">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3 text-muted text-uppercase small">
+        <i class="bi bi-people-fill me-1"></i>ผู้ใช้งานในร้าน
+      </h6>
+
+      {% if staff_list %}
+      <div class="table-responsive mb-3">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>ชื่อ</th>
+              <th>username</th>
+              <th class="text-center">บทบาท</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in staff_list %}
+            <tr>
+              <td>{{ s.name }}</td>
+              <td class="font-monospace small">{{ s.username }}</td>
+              <td class="text-center">
+                <span class="badge bg-{{ 'warning text-dark' if s.role=='owner' else 'secondary' }}">{{ s.role }}</span>
+              </td>
+              <td class="text-end">
+                <form method="post" action="/web/settings/staff/{{ s.id }}/delete"
+                      onsubmit="return confirm('ลบผู้ใช้ {{ s.name }}?')" class="d-inline">
+                  <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted small mb-3">ยังไม่มีผู้ใช้งานเพิ่มเติม</p>
+      {% endif %}
+
+      <hr>
+      <h6 class="fw-bold mb-3 text-muted text-uppercase small">
+        <i class="bi bi-person-plus me-1"></i>เพิ่มผู้ใช้งาน
+      </h6>
+      <form method="post" action="/web/settings/staff/add">
+        <div class="mb-2">
+          <input type="text" name="name" class="form-control form-control-sm"
+                 placeholder="ชื่อ-นามสกุล" required>
+        </div>
+        <div class="mb-2">
+          <input type="text" name="username" class="form-control form-control-sm"
+                 placeholder="username" required>
+        </div>
+        <div class="mb-3">
+          <input type="password" name="password" class="form-control form-control-sm"
+                 placeholder="รหัสผ่าน" required minlength="6">
+        </div>
+        <button type="submit" class="btn btn-success w-100">
+          <i class="bi bi-person-plus me-1"></i>เพิ่มผู้ใช้งาน
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

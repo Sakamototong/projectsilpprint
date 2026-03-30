@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}ลงทะเบียนร้านค้า – SilpPrint{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-sm-10 col-md-7 col-lg-5">
+    <div class="card p-4">
+      <h5 class="card-title mb-4 fw-bold">
+        <i class="bi bi-shop text-primary me-2"></i>ลงทะเบียนร้านค้าใหม่
+      </h5>
+
+      {% if error %}
+      <div class="alert alert-danger py-2"><i class="bi bi-exclamation-circle me-1"></i>{{ error }}</div>
+      {% endif %}
+
+      <form method="post" action="/web/register">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">ชื่อร้านค้า <span class="text-danger">*</span></label>
+          <input type="text" name="store_name" class="form-control" required autofocus
+                 placeholder="เช่น ปั๊มน้ำมัน ABC สาขา 1">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">ชื่อผู้ใช้ <span class="text-danger">*</span></label>
+          <input type="text" name="username" class="form-control" required
+                 placeholder="ตัวอักษรและตัวเลข ไม่มีช่องว่าง" pattern="[a-zA-Z0-9_]+">
+          <div class="form-text">ใช้สำหรับเข้าสู่ระบบ เปลี่ยนภายหลังไม่ได้</div>
+        </div>
+        <div class="row g-2 mb-4">
+          <div class="col">
+            <label class="form-label fw-semibold">รหัสผ่าน <span class="text-danger">*</span></label>
+            <input type="password" name="password" id="pw" class="form-control" required minlength="6" placeholder="อย่างน้อย 6 ตัว">
+          </div>
+          <div class="col">
+            <label class="form-label fw-semibold">ยืนยันรหัสผ่าน <span class="text-danger">*</span></label>
+            <input type="password" name="password_confirm" id="pw2" class="form-control" required minlength="6" placeholder="พิมพ์ซ้ำ">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-success btn-lg w-100">
+          <i class="bi bi-check-circle me-1"></i>ลงทะเบียน
+        </button>
+      </form>
+
+      <hr>
+      <p class="text-center mb-0 text-muted">
+        มีบัญชีแล้ว? <a href="/web/login" class="fw-semibold">เข้าสู่ระบบ</a>
+      </p>
+    </div>
+  </div>
+</div>
+<script>
+  document.querySelector("form").addEventListener("submit", function(e){
+    if(document.getElementById("pw").value !== document.getElementById("pw2").value){
+      e.preventDefault(); alert("รหัสผ่านไม่ตรงกัน");
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}แก้ไขสมาชิก – {{ member.name }}{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4">
+  <a href="/web/members/{{ member.id }}" class="btn btn-outline-secondary btn-sm me-3">
+    <i class="bi bi-arrow-left"></i> กลับ
+  </a>
+  <h5 class="mb-0 fw-bold">
+    <i class="bi bi-pencil-square text-primary me-2"></i>แก้ไขข้อมูลสมาชิก
+  </h5>
+</div>
+
+{% if error %}
+<div class="alert alert-danger alert-dismissible fade show py-2">
+  <i class="bi bi-exclamation-circle me-1"></i>{{ error }}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-5">
+    <div class="card p-4">
+
+      <form method="post" action="/web/members/{{ member.id }}/edit">
+
+        <div class="mb-3">
+          <label class="form-label fw-bold">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control"
+                 value="{{ member.name }}" required>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label fw-bold">เบอร์โทรศัพท์</label>
+            <input type="tel" name="phone" class="form-control"
+                   value="{{ member.phone or '' }}" placeholder="0xx-xxx-xxxx">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-bold">อีเมล</label>
+            <input type="email" name="email" class="form-control"
+                   value="{{ member.email or '' }}" placeholder="example@email.com">
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label fw-bold">รหัสสมาชิก</label>
+            <input type="text" name="member_code" class="form-control font-monospace"
+                   value="{{ member.member_code or '' }}"
+                   placeholder="M0000001 (ระบบจะใช้รหัสเดิมหากว่างเปล่า)">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-bold">วันเกิด</label>
+            <input type="date" name="birthdate" class="form-control"
+                   value="{{ member.birthdate or '' }}">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-bold">ระดับสมาชิก</label>
+          <select name="tier" class="form-select">
+            {% set tiers = [('general','ทั่วไป','secondary'),('silver','Silver','light text-dark'),('gold','Gold','warning'),('platinum','Platinum','info')] %}
+            {% for val, label, _ in tiers %}
+            <option value="{{ val }}" {% if member.tier == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="d-grid gap-2">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>บันทึกการแก้ไข
+          </button>
+          <a href="/web/members/{{ member.id }}" class="btn btn-outline-secondary">ยกเลิก</a>
+        </div>
+
+      </form>
+    </div>
+
+    <div class="card p-3 mt-3 border-danger bg-danger bg-opacity-10">
+      <h6 class="text-danger fw-bold mb-2">
+        <i class="bi bi-exclamation-triangle-fill me-1"></i>โซนอันตราย
+      </h6>
+      <p class="small text-muted mb-2">
+        การลบสมาชิกจะลบข้อมูลทั้งหมด รวมถึงประวัติใบเสร็จและคะแนนสะสม ไม่สามารถเรียกคืนได้
+      </p>
+      <button type="button" class="btn btn-outline-danger btn-sm"
+              data-bs-toggle="modal" data-bs-target="#deleteModal">
+        <i class="bi bi-trash me-1"></i>ลบสมาชิกนี้
+      </button>
+    </div>
+  </div>
+</div>
+
+{# ── Delete confirm modal ── #}
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-danger">
+        <h5 class="modal-title text-danger fw-bold">
+          <i class="bi bi-trash me-1"></i>ยืนยันการลบสมาชิก
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>คุณต้องการลบสมาชิก <strong>{{ member.name }}</strong> ใช่หรือไม่?</p>
+        <p class="text-danger small mb-0">
+          <i class="bi bi-exclamation-circle me-1"></i>
+          ข้อมูลทั้งหมดรวมถึงใบเสร็จ {{ receipts_count or '' }} รายการจะถูกลบถาวร
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+        <form method="post" action="/web/members/{{ member.id }}/delete" class="d-inline">
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash me-1"></i>ยืนยัน ลบเลย
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}สมัครสมาชิก – SilpPrint{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-sm-11 col-md-9 col-lg-7">
+    <div class="card p-4">
+      <div class="d-flex align-items-center mb-4">
+        <a href="/web/members" class="btn btn-outline-secondary btn-sm me-3">
+          <i class="bi bi-arrow-left"></i>
+        </a>
+        <h5 class="mb-0 fw-bold">
+          <i class="bi bi-person-plus-fill text-primary me-2"></i>สมัครสมาชิกใหม่
+        </h5>
+      </div>
+
+      {% if error %}
+      <div class="alert alert-danger py-2 mb-3">
+        <i class="bi bi-exclamation-circle me-1"></i>{{ error }}
+      </div>
+      {% endif %}
+
+      <form method="post" action="/web/enroll">
+        <!-- ข้อมูลหลัก -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control form-control-lg" required autofocus
+                 placeholder="กรุณากรอกชื่อ-นามสกุล"
+                 value="{{ form.name if form else '' }}">
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">เบอร์โทรศัพท์</label>
+            <input type="tel" name="phone" class="form-control"
+                   placeholder="0812345678" pattern="[0-9]{9,10}"
+                   value="{{ form.phone if form else '' }}">
+            <div class="form-text">รองรับการค้นหาและระบุตัวตน</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">อีเมล</label>
+            <input type="email" name="email" class="form-control"
+                   placeholder="example@email.com"
+                   value="{{ form.email if form else '' }}">
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">รหัสสมาชิก</label>
+            <input type="text" name="member_code" class="form-control"
+                   placeholder="ออกให้อัตโนมัติหากว่างไว้">
+            <div class="form-text">รองรับบาร์โค้ด / QR / บัตรสมาชิก</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">วันเกิด</label>
+            <input type="date" name="birthdate" class="form-control"
+                   value="{{ form.birthdate if form else '' }}">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">ระดับสมาชิก</label>
+          <div class="d-flex gap-2 flex-wrap">
+            {% set tiers = [('general','ทั่วไป','secondary'),('silver','Silver','light'),('gold','Gold','warning'),('platinum','Platinum','info')] %}
+            {% for val, label, color in tiers %}
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="tier" id="tier_{{ val }}"
+                     value="{{ val }}" {% if (form and form.tier == val) or (not form and val == 'general') %}checked{% endif %}>
+              <label class="form-check-label" for="tier_{{ val }}">
+                <span class="badge bg-{{ color }} text-{{ 'dark' if color == 'warning' else 'white' }}">{{ label }}</span>
+              </label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-lg flex-fill">
+            <i class="bi bi-check-circle me-1"></i>บันทึกสมาชิก
+          </button>
+          <a href="/web/members" class="btn btn-outline-secondary btn-lg flex-fill">
+            <i class="bi bi-x-circle me-1"></i>ยกเลิก
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

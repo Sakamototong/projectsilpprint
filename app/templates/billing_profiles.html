@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}ที่อยู่ออกบิล – {{ member.name }}{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4">
+  <a href="/web/members/{{ member.id }}" class="btn btn-outline-secondary btn-sm me-3">
+    <i class="bi bi-arrow-left"></i> กลับ
+  </a>
+  <h5 class="mb-0 fw-bold">
+    <i class="bi bi-building me-2 text-primary"></i>ที่อยู่ออกบิล / ใบเสร็จ
+  </h5>
+  <span class="ms-2 text-muted">— {{ member.name }}</span>
+</div>
+
+{% if request.query_params.get('saved') %}
+<div class="alert alert-success py-2 d-flex align-items-center">
+  <i class="bi bi-check-circle-fill me-2"></i>บันทึกเรียบร้อยแล้ว
+  <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="row g-4">
+  <!-- รายการที่อยู่ที่บันทึกไว้ -->
+  <div class="col-lg-7">
+    <h6 class="fw-bold small text-muted text-uppercase mb-3">ที่อยู่ที่บันทึกไว้</h6>
+    {% if profiles %}
+    {% for bp in profiles %}
+    <div class="card p-3 mb-3">
+      <div class="d-flex align-items-start">
+        <div class="flex-grow-1">
+          <div class="d-flex align-items-center mb-1">
+            <span class="fw-bold me-2">{{ bp.label }}</span>
+            {% if bp.is_default %}
+            <span class="badge bg-success small">ค่าเริ่มต้น</span>
+            {% endif %}
+          </div>
+          {% if bp.company_name %}<div class="small"><i class="bi bi-building me-1 text-muted"></i>{{ bp.company_name }}</div>{% endif %}
+          {% if bp.tax_id %}<div class="small text-muted">เลขผู้เสียภาษี: {{ bp.tax_id }}</div>{% endif %}
+          {% if bp.address %}<div class="small text-muted"><i class="bi bi-geo-alt me-1"></i>{{ bp.address }}</div>{% endif %}
+          {% if bp.phone %}<div class="small text-muted"><i class="bi bi-telephone me-1"></i>{{ bp.phone }}</div>{% endif %}
+          {% if bp.email %}<div class="small text-muted"><i class="bi bi-envelope me-1"></i>{{ bp.email }}</div>{% endif %}
+        </div>
+        <form method="post" action="/web/members/{{ member.id }}/billing-profiles/{{ bp.id }}/delete"
+              onsubmit="return confirm('ลบที่อยู่นี้?')" class="ms-2">
+          <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="card p-4 text-center text-muted">
+      <i class="bi bi-building fs-2 mb-2"></i>
+      <p class="mb-0">ยังไม่มีที่อยู่ออกบิล</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ฟอร์มเพิ่มใหม่ -->
+  <div class="col-lg-5">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3 text-muted text-uppercase small">
+        <i class="bi bi-plus-circle me-1"></i>เพิ่มที่อยู่ใหม่
+      </h6>
+      <form method="post" action="/web/members/{{ member.id }}/billing-profiles">
+        <div class="mb-3">
+          <label class="form-label small fw-bold">ชื่อแสดง / ป้ายกำกับ <span class="text-danger">*</span></label>
+          <input type="text" name="label" class="form-control form-control-sm"
+                 placeholder="เช่น สำนักงานใหญ่, สาขา 1" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">ชื่อบริษัท / นิติบุคคล</label>
+          <input type="text" name="company_name" class="form-control form-control-sm"
+                 placeholder="บริษัท XYZ จำกัด">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">เลขประจำตัวผู้เสียภาษี</label>
+          <input type="text" name="tax_id" class="form-control form-control-sm"
+                 placeholder="0-0000-00000-00-0">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">ที่อยู่</label>
+          <textarea name="address" class="form-control form-control-sm" rows="3"
+                    placeholder="เลขที่ ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด รหัสไปรษณีย์"></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">เบอร์โทรศัพท์</label>
+          <input type="text" name="phone" class="form-control form-control-sm" placeholder="02-xxx-xxxx">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">อีเมล</label>
+          <input type="email" name="email" class="form-control form-control-sm" placeholder="info@company.com">
+        </div>
+        <div class="mb-3 form-check">
+          <input type="checkbox" class="form-check-input" name="is_default" value="1" id="isDefault">
+          <label class="form-check-label small" for="isDefault">ตั้งเป็นค่าเริ่มต้น</label>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-save me-1"></i>บันทึกที่อยู่
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

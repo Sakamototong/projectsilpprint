@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+{% block title %}{{ member.name }} – SilpPrint{% endblock %}
+{% block content %}
+
+{% if request.query_params.get('updated') %}
+<div class="alert alert-success alert-dismissible fade show py-2">
+  <i class="bi bi-check-circle-fill me-1"></i>อัปเดตข้อมูลเรียบร้อยแล้ว
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="d-flex align-items-center mb-4">
+  <a href="/web/members" class="btn btn-outline-secondary btn-sm me-3">
+    <i class="bi bi-arrow-left"></i> กลับ
+  </a>
+  <h5 class="mb-0 fw-bold">
+    <i class="bi bi-person-circle text-primary me-2"></i>ข้อมูลสมาชิก
+  </h5>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/web/members/{{ member.id }}/edit" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-pencil-square me-1"></i>แก้ไข
+    </a>
+    <button type="button" class="btn btn-outline-danger btn-sm"
+            data-bs-toggle="modal" data-bs-target="#deleteModal">
+      <i class="bi bi-trash me-1"></i>ลบสมาชิก
+    </button>
+    <a href="/web/members/{{ member.id }}/new-bill" class="btn btn-success btn-sm">
+      <i class="bi bi-receipt-cutoff me-1"></i>ออกบิล / ใบเสร็จ
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- ข้อมูลหลัก -->
+  <div class="col-md-5">
+    <div class="card p-4 text-center">
+      <div class="mb-3">
+        <div class="rounded-circle bg-primary d-inline-flex align-items-center justify-content-center"
+             style="width:80px;height:80px;">
+          <i class="bi bi-person-fill text-white" style="font-size:2.5rem;"></i>
+        </div>
+      </div>
+      <h4 class="fw-bold">{{ member.name }}</h4>
+      {% set tc = {'general':'secondary','silver':'light','gold':'warning','platinum':'info'} %}
+      <span class="badge tier-{{ member.tier or 'general' }} mb-3 fs-6">
+        {{ {'general':'ทั่วไป','silver':'Silver','gold':'Gold','platinum':'Platinum'}.get(member.tier, member.tier) }}
+      </span>
+
+      <!-- คะแนนสะสม + Tier Progress -->
+      <div class="card bg-warning bg-opacity-10 border-warning mb-3">
+        <div class="card-body py-3">
+          <p class="text-muted mb-1 small">คะแนนสะสม</p>
+          <p class="display-6 fw-bold mb-0 text-warning">
+            <i class="bi bi-star-fill me-1"></i>{{ member.points }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Tier Progress -->
+      {% set pts = member.points or 0 %}
+      {% if pts < 500 %}
+        {% set next_tier = 'Silver' %}{% set next_pts = 500 %}{% set prev_pts = 0 %}
+      {% elif pts < 2000 %}
+        {% set next_tier = 'Gold' %}{% set next_pts = 2000 %}{% set prev_pts = 500 %}
+      {% elif pts < 5000 %}
+        {% set next_tier = 'Platinum' %}{% set next_pts = 5000 %}{% set prev_pts = 2000 %}
+      {% else %}
+        {% set next_tier = '' %}{% set next_pts = 5000 %}{% set prev_pts = 5000 %}
+      {% endif %}
+      <div class="card border p-3 mb-3 small">
+        <div class="d-flex justify-content-between mb-1">
+          <span class="fw-bold">ความคืบหน้าสู่ระดับถัดไป</span>
+          {% if next_tier %}
+          <span class="text-muted">เหลืออีก {{ next_pts - pts }} คะแนน → {{ next_tier }}</span>
+          {% else %}
+          <span class="text-success fw-bold">ระดับสูงสุดแล้ว 🎉</span>
+          {% endif %}
+        </div>
+        {% if next_tier %}
+        {% set pct = [((pts - prev_pts) / (next_pts - prev_pts) * 100)|int, 100]|min %}
+        <div class="progress" style="height:10px;">
+          <div class="progress-bar bg-warning" style="width:{{ pct }}%"></div>
+        </div>
+        <div class="d-flex justify-content-between mt-1 text-muted" style="font-size:0.7rem;">
+          <span>{{ prev_pts }} pts</span><span>{{ next_pts }} pts</span>
+        </div>
+        {% endif %}
+        <div class="mt-2 text-muted" style="font-size:0.75rem;">
+          ⭐ ระดับ: <strong>ทั่วไป 0</strong> → <strong>Silver 500</strong> → <strong>Gold 2,000</strong> → <strong>Platinum 5,000</strong> คะแนน
+        </div>
+      </div>
+
+      <!-- เพิ่มคะแนน -->
+      <form method="post" action="/web/members/{{ member.id }}/add-points" class="d-flex gap-2">
+        <input type="number" name="points" class="form-control" placeholder="จำนวน" min="1" required>
+        <button type="submit" class="btn btn-warning btn-sm text-nowrap">
+          <i class="bi bi-plus-circle"></i> เพิ่มคะแนน
+        </button>
+      </form>
+      <div class="form-text mt-1">กรอกจำนวนบวก = เพิ่ม / ลบ = หัก</div>
+    </div>
+  </div>
+
+  <!-- รายละเอียด -->
+  <div class="col-md-7">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3 text-muted text-uppercase small">ข้อมูลส่วนตัว</h6>
+      <table class="table table-borderless table-sm">
+        <tbody>
+          <tr>
+            <td class="text-muted" style="width:40%">รหัสสมาชิก</td>
+            <td><code>{{ member.member_code if member.member_code else '–' }}</code></td>
+          </tr>
+          <tr>
+            <td class="text-muted">เบอร์โทรศัพท์</td>
+            <td>{{ member.phone if member.phone else '–' }}</td>
+          </tr>
+          <tr>
+            <td class="text-muted">อีเมล</td>
+            <td>{{ member.email if member.email else '–' }}</td>
+          </tr>
+          <tr>
+            <td class="text-muted">วันเกิด</td>
+            <td>{{ member.birthdate if member.birthdate else '–' }}</td>
+          </tr>
+          <tr>
+            <td class="text-muted">วันที่สมัคร</td>
+            <td>{{ member.created_at.strftime('%d/%m/%Y %H:%M') if member.created_at else '–' }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- QR Code Placeholder -->
+      <h6 class="fw-bold mb-3 mt-2 text-muted text-uppercase small">รหัสระบุตัวตน</h6>
+      <div class="border rounded p-3 text-center bg-light">
+        <p class="mb-1 text-muted small">บาร์โค้ด / QR / บัตรสมาชิก</p>
+        <h4 class="fw-bold font-monospace mb-0">{{ member.member_code if member.member_code else '–' }}</h4>
+        <p class="text-muted mt-1 small">นำรหัสนี้ไปสร้าง QR Code หรือบาร์โค้ดได้</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ประวัติใบเสร็จ -->
+{% if receipts %}
+<div class="mt-4">
+  <h6 class="fw-bold mb-3 text-muted text-uppercase small">
+    <i class="bi bi-clock-history me-1"></i>ประวัติใบเสร็จ
+  </h6>
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>เลขที่</th>
+            <th>วันที่</th>
+            <th class="text-end">ยอดรวม (฿)</th>
+            <th>ชำระด้วย</th>
+            <th class="text-center">รายการ</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set pm_map = {'cash':'เงินสด','transfer':'โอน','qr':'QR','card':'บัตร'} %}
+          {% for r in receipts %}
+          <tr>
+            <td class="font-monospace">#{{ '%05d'|format(r.id) }}</td>
+            <td class="small">{{ r.printed_at.strftime('%d/%m/%Y %H:%M') if r.printed_at else '–' }}</td>
+            <td class="text-end fw-bold text-primary">฿{{ "%.2f"|format((r.raw_payload or {}).get('total', 0)|float) }}</td>
+            <td class="small">{{ pm_map.get((r.raw_payload or {}).get('payment_method',''), (r.raw_payload or {}).get('payment_method','–')) }}</td>
+            <td class="text-center small">{{ (r.raw_payload or {}).get('items', [])|length }} รายการ</td>
+            <td>
+              <a href="/web/receipts/{{ r.id }}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-eye"></i> ดู
+              </a>
+              <a href="/web/receipts/{{ r.id }}/edit" class="btn btn-outline-warning btn-sm">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="/web/receipts/{{ r.id }}/delete" class="d-inline"
+                    onsubmit="return confirm('ลบใบเสร็จ #{{ '%05d'|format(r.id) }} ใช่หรือไม่?')">
+                <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="mt-4">
+  <div class="card p-4 text-center text-muted">
+    <i class="bi bi-receipt fs-2 mb-2"></i>
+    <p class="mb-2">ยังไม่มีประวัติใบเสร็จ</p>
+    <a href="/web/members/{{ member.id }}/new-bill" class="btn btn-success btn-sm">
+      <i class="bi bi-receipt-cutoff me-1"></i>ออกบิลแรก
+    </a>
+  </div>
+</div>
+{% endif %}
+
+<!-- ที่อยู่สำหรับออกบิล -->
+<div class="mt-4">
+  <div class="d-flex align-items-center mb-3">
+    <h6 class="fw-bold mb-0 text-muted text-uppercase small">
+      <i class="bi bi-geo-alt me-1"></i>ที่อยู่สำหรับออกบิล / ใบกำกับภาษี
+    </h6>
+    <button class="btn btn-outline-primary btn-sm ms-auto"
+            data-bs-toggle="collapse" data-bs-target="#addAddressForm">
+      <i class="bi bi-plus-circle me-1"></i>เพิ่มที่อยู่
+    </button>
+  </div>
+
+  <!-- ฟอร์มเพิ่มที่อยู่ (collapse) -->
+  <div class="collapse mb-3" id="addAddressForm">
+    <div class="card border-primary p-3">
+      <h6 class="fw-bold text-primary mb-3 small">เพิ่มที่อยู่ใหม่</h6>
+      <form method="post" action="/web/members/{{ member.id }}/billing-profiles">
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label form-label-sm">ชื่อที่อยู่ / ป้ายกำกับ <span class="text-danger">*</span></label>
+            <input type="text" name="label" class="form-control form-control-sm" placeholder="เช่น สำนักงานใหญ่" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label form-label-sm">ชื่อบริษัท / ผู้รับใบกำกับ</label>
+            <input type="text" name="company_name" class="form-control form-control-sm" placeholder="ชื่อบริษัท / บุคคล">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label form-label-sm">เลขผู้เสียภาษี</label>
+            <input type="text" name="tax_id" class="form-control form-control-sm" placeholder="13 หลัก">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label form-label-sm">เบอร์โทร</label>
+            <input type="text" name="phone" class="form-control form-control-sm" placeholder="0xx-xxx-xxxx">
+          </div>
+          <div class="col-12">
+            <label class="form-label form-label-sm">ที่อยู่</label>
+            <textarea name="address" class="form-control form-control-sm" rows="2" placeholder="บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์"></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label form-label-sm">อีเมล</label>
+            <input type="email" name="email" class="form-control form-control-sm" placeholder="email@example.com">
+          </div>
+          <div class="col-md-6 d-flex align-items-end">
+            <div class="form-check mb-2">
+              <input type="checkbox" name="is_default" value="1" class="form-check-input" id="isDefaultCheck">
+              <label class="form-check-label small" for="isDefaultCheck">ตั้งเป็นที่อยู่หลัก</label>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-save me-1"></i>บันทึก
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm"
+                  data-bs-toggle="collapse" data-bs-target="#addAddressForm">ยกเลิก</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- รายการที่อยู่ -->
+  {% if billing_profiles %}
+  <div class="row g-3">
+    {% for bp in billing_profiles %}
+    <div class="col-md-6">
+      <div class="card h-100 border{% if bp.is_default %}-primary{% endif %}">
+        <div class="card-body py-3 px-3">
+          <div class="d-flex justify-content-between align-items-start mb-1">
+            <span class="fw-bold small">{{ bp.label }}
+              {% if bp.is_default %}<span class="badge bg-primary ms-1" style="font-size:.65rem;">หลัก</span>{% endif %}
+            </span>
+            <form method="post" action="/web/members/{{ member.id }}/billing-profiles/{{ bp.id }}/delete"
+                  onsubmit="return confirm('ลบที่อยู่ {{ bp.label }} ใช่หรือไม่?')" class="ms-2">
+              <button class="btn btn-outline-danger btn-sm py-0 px-1" style="font-size:.75rem;">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </div>
+          {% if bp.company_name %}<p class="mb-1 small fw-semibold">{{ bp.company_name }}</p>{% endif %}
+          {% if bp.tax_id %}<p class="mb-1 small text-muted">เลขภาษี: {{ bp.tax_id }}</p>{% endif %}
+          {% if bp.address %}<p class="mb-1 small text-muted" style="white-space:pre-wrap;">{{ bp.address }}</p>{% endif %}
+          {% if bp.phone %}<p class="mb-0 small text-muted"><i class="bi bi-telephone me-1"></i>{{ bp.phone }}</p>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card p-3 text-center text-muted small">
+    <i class="bi bi-geo-alt fs-4 mb-1"></i>
+    <p class="mb-0">ยังไม่มีที่อยู่สำหรับออกบิล</p>
+  </div>
+  {% endif %}
+</div>
+
+{# ── Delete member modal ── #}
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-danger fw-bold">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i>ยืนยันการลบสมาชิก
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>คุณต้องการลบสมาชิก <strong>{{ member.name }}</strong> ออกจากระบบใช่หรือไม่?</p>
+        <p class="text-danger small mb-0">
+          <i class="bi bi-exclamation-circle me-1"></i>
+          ข้อมูลทั้งหมด รวมถึงประวัติใบเสร็จและคะแนนสะสม
+          <strong>จะถูกลบถาวร ไม่สามารถเรียกคืนได้</strong>
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+        <form method="post" action="/web/members/{{ member.id }}/delete">
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash me-1"></i>ยืนยัน ลบเลย
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

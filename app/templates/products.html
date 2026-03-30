@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}รายการสินค้า – SilpPrint{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4">
+  <h5 class="mb-0 fw-bold">
+    <i class="bi bi-box-seam me-2 text-primary"></i>รายการสินค้า / บริการ
+  </h5>
+</div>
+
+{% if request.query_params.get('saved') %}
+<div class="alert alert-success py-2">
+  <i class="bi bi-check-circle-fill me-2"></i>บันทึกเรียบร้อยแล้ว
+  <button type="button" class="btn-close float-end" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="row g-4">
+  <!-- รายการสินค้าปัจจุบัน -->
+  <div class="col-lg-8">
+    {% set cat_map = {'fuel':'⛽ น้ำมัน','service':'🔧 บริการ','other':'📦 อื่นๆ'} %}
+    {% if products %}
+    {% set categories = products | groupby('category') %}
+    {% for cat, prods in categories %}
+    <h6 class="fw-bold small text-muted text-uppercase mb-2">{{ cat_map.get(cat, cat) }}</h6>
+    <div class="card mb-4">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>ชื่อสินค้า</th>
+              <th class="text-center">หน่วย</th>
+              <th class="text-end">ราคา (฿)</th>
+              <th class="text-center">สถานะ</th>
+              <th class="text-center" style="width:100px">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in prods %}
+            <tr>
+              <td class="fw-bold">{{ p.name }}</td>
+              <td class="text-center text-muted">{{ p.unit }}</td>
+              <td class="text-end fw-bold text-primary">{{ "%.2f"|format(p.price) }}</td>
+              <td class="text-center">
+                {% if p.is_active %}
+                <span class="badge bg-success">ใช้งาน</span>
+                {% else %}
+                <span class="badge bg-secondary">ปิด</span>
+                {% endif %}
+              </td>
+              <td class="text-center">
+                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal"
+                        data-bs-target="#editModal{{ p.id }}">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form method="post" action="/web/products/{{ p.id }}/delete" class="d-inline"
+                      onsubmit="return confirm('ลบสินค้านี้?')">
+                  <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+
+            <!-- Edit Modal -->
+            <div class="modal fade" id="editModal{{ p.id }}" tabindex="-1">
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  <form method="post" action="/web/products/{{ p.id }}/edit">
+                    <div class="modal-header">
+                      <h5 class="modal-title fw-bold">แก้ไขสินค้า</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                      <div class="mb-3">
+                        <label class="form-label small fw-bold">ชื่อสินค้า</label>
+                        <input type="text" name="name" class="form-control form-control-sm" value="{{ p.name }}" required>
+                      </div>
+                      <div class="row g-2 mb-3">
+                        <div class="col">
+                          <label class="form-label small fw-bold">หน่วย</label>
+                          <input type="text" name="unit" class="form-control form-control-sm" value="{{ p.unit }}">
+                        </div>
+                        <div class="col">
+                          <label class="form-label small fw-bold">ราคา (฿)</label>
+                          <input type="number" name="price" class="form-control form-control-sm"
+                                 value="{{ p.price }}" step="0.01" min="0">
+                        </div>
+                      </div>
+                      <div class="mb-3">
+                        <label class="form-label small fw-bold">หมวดหมู่</label>
+                        <select name="category" class="form-select form-select-sm">
+                          <option value="fuel" {% if p.category=='fuel' %}selected{% endif %}>⛽ น้ำมัน</option>
+                          <option value="service" {% if p.category=='service' %}selected{% endif %}>🔧 บริการ</option>
+                          <option value="other" {% if p.category=='other' %}selected{% endif %}>📦 อื่นๆ</option>
+                        </select>
+                      </div>
+                      <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="is_active" value="1"
+                               id="active{{ p.id }}" {% if p.is_active %}checked{% endif %}>
+                        <label class="form-check-label small" for="active{{ p.id }}">เปิดใช้งาน</label>
+                      </div>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+                      <button type="submit" class="btn btn-primary btn-sm">บันทึก</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="card p-5 text-center text-muted">
+      <i class="bi bi-box-seam fs-1 mb-3"></i>
+      <h6>ยังไม่มีสินค้า</h6>
+      <p class="small">เพิ่มสินค้าจากฟอร์มด้านขวา</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ฟอร์มเพิ่มสินค้า -->
+  <div class="col-lg-4">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3 text-muted text-uppercase small">
+        <i class="bi bi-plus-circle me-1"></i>เพิ่มสินค้าใหม่
+      </h6>
+      <form id="addProductForm" method="post" action="/web/products/add">
+        <div class="mb-3">
+          <label class="form-label small fw-bold">ชื่อสินค้า <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control form-control-sm"
+                 placeholder="เช่น น้ำมันเบนซิน 95" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">หมวดหมู่</label>
+          <select name="category" class="form-select form-select-sm">
+            <option value="fuel">⛽ น้ำมัน</option>
+            <option value="service">🔧 บริการ</option>
+            <option value="other">📦 อื่นๆ</option>
+          </select>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col">
+            <label class="form-label small fw-bold">หน่วย</label>
+            <input type="text" name="unit" class="form-control form-control-sm" value="ลิตร">
+          </div>
+          <div class="col">
+            <label class="form-label small fw-bold">ราคา/หน่วย (฿)</label>
+            <input type="number" name="price" class="form-control form-control-sm"
+                   value="0.00" step="0.01" min="0" required>
+          </div>
+        </div>
+
+        <hr class="my-3">
+        <p class="small text-muted mb-2">เพิ่มสินค้าน้ำมันสำเร็จรูป:</p>
+        <div class="d-flex flex-wrap gap-1 mb-3">
+          <button type="button" class="btn btn-outline-secondary btn-sm preset-btn"
+                  data-name="น้ำมันเบนซิน 91" data-unit="ลิตร" data-cat="fuel" data-price="40.10">E91</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm preset-btn"
+                  data-name="น้ำมันเบนซิน 95" data-unit="ลิตร" data-cat="fuel" data-price="44.85">E95</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm preset-btn"
+                  data-name="น้ำมันแก๊สโซฮอล์ E20" data-unit="ลิตร" data-cat="fuel" data-price="30.64">E20</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm preset-btn"
+                  data-name="น้ำมันแก๊สโซฮอล์ E85" data-unit="ลิตร" data-cat="fuel" data-price="23.17">E85</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm preset-btn"
+                  data-name="น้ำมันดีเซล B7" data-unit="ลิตร" data-cat="fuel" data-price="29.94">B7</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm preset-btn"
+                  data-name="น้ำมันดีเซล B20" data-unit="ลิตร" data-cat="fuel" data-price="28.99">B20</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm preset-btn"
+                  data-name="น้ำมันดีเซล Premium" data-unit="ลิตร" data-cat="fuel" data-price="33.74">ดีเซล+</button>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-save me-1"></i>เพิ่มสินค้า
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', function () {
+    const f = document.getElementById('addProductForm');
+    f.querySelector('[name=name]').value     = this.dataset.name;
+    f.querySelector('[name=unit]').value     = this.dataset.unit;
+    f.querySelector('[name=price]').value    = this.dataset.price;
+    f.querySelector('[name=category]').value = this.dataset.cat;
+    f.submit();
+  });
+});
+</script>
+{% endblock %}

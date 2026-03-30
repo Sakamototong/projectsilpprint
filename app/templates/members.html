@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}รายชื่อสมาชิก – SilpPrint{% endblock %}
+{% block content %}
+
+{% if enrolled %}
+<div class="alert alert-success alert-dismissible fade show py-2" role="alert">
+  <i class="bi bi-check-circle-fill me-1"></i>สมัครสมาชิกสำเร็จแล้ว!
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if request.query_params.get('deleted') %}
+<div class="alert alert-warning alert-dismissible fade show py-2" role="alert">
+  <i class="bi bi-trash-fill me-1"></i>ลบสมาชิกเรียบร้อยแล้ว
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h5 class="mb-0 fw-bold">
+    <i class="bi bi-people-fill text-primary me-2"></i>รายชื่อสมาชิก
+    <span class="badge bg-secondary ms-1">{{ total }}</span>
+  </h5>
+  <a href="/web/enroll" class="btn btn-primary">
+    <i class="bi bi-person-plus-fill me-1"></i>สมัครสมาชิกใหม่
+  </a>
+</div>
+
+<!-- ค้นหา -->
+<div class="card mb-3">
+  <div class="card-body py-3">
+    <form method="get" action="/web/members" class="row g-2 align-items-end">
+      <div class="col-md-6 col-lg-5">
+        <input type="text" name="q" class="form-control"
+               placeholder="ค้นหาด้วยชื่อ, เบอร์โทร, รหัสสมาชิก"
+               value="{{ q }}">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary">
+          <i class="bi bi-search"></i> ค้นหา
+        </button>
+        <a href="/web/members" class="btn btn-outline-secondary">ล้าง</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ตาราง -->
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th style="width:60px;">#</th>
+            <th>ชื่อ-นามสกุล</th>
+            <th>เบอร์โทร</th>
+            <th>รหัสสมาชิก</th>
+            <th>ระดับ</th>
+            <th>คะแนน</th>
+            <th>วันสมัคร</th>
+            <th style="width:80px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in members %}
+          <tr>
+            <td class="text-muted small">{{ m.id }}</td>
+            <td class="fw-semibold">{{ m.name }}</td>
+            <td>{{ m.phone if m.phone else '–' }}</td>
+            <td><code class="small">{{ m.member_code if m.member_code else '–' }}</code></td>
+            <td>
+              {% set tc = {'general':'secondary','silver':'light','gold':'warning','platinum':'info'} %}
+              <span class="badge tier-{{ m.tier or 'general' }}">
+                {{ {'general':'ทั่วไป','silver':'Silver','gold':'Gold','platinum':'Platinum'}.get(m.tier, m.tier) }}
+              </span>
+            </td>
+            <td>
+              <span class="badge bg-warning text-dark points-badge">
+                <i class="bi bi-star-fill me-1"></i>{{ m.points }}
+              </span>
+            </td>
+            <td class="small text-muted">
+              {{ m.created_at.strftime('%d/%m/%Y') if m.created_at else '–' }}
+            </td>
+            <td>
+              <a href="/web/members/{{ m.id }}" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-eye-fill"></i>
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="text-center text-muted py-5">
+              <i class="bi bi-inbox display-6 d-block mb-2"></i>
+              {% if q %}ไม่พบสมาชิกที่ค้นหา{% else %}ยังไม่มีสมาชิก กด <strong>สมัครสมาชิกใหม่</strong> เพื่อเริ่มต้น{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

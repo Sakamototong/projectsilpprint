@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+{% block title %}ใบเสร็จ #{{ '%05d'|format(receipt.id) }}{% endblock %}
+{% block content %}
+
+{# ─── resolve billing profile ─── #}
+{% set bp_raw = payload.get('billing_profile') %}
+{% if bp_raw and bp_raw.get('company_name') %}
+  {% set bp = bp_raw %}
+{% else %}
+  {% set bp = none %}
+{% endif %}
+{% set cust_name   = bp.company_name if bp else (member.name if member else '–') %}
+{% set cust_addr   = bp.address if bp else '' %}
+{% set cust_tax    = bp.tax_id  if bp else '' %}
+{% set cust_phone  = bp.phone   if bp else (member.phone if member else '') %}
+{% set items       = payload.get('items', []) %}
+{% set subtotal    = payload.get('subtotal', payload.get('total', 0))|float %}
+{% set vat_amount  = payload.get('vat_amount', 0)|float %}
+{% set vat_rate    = payload.get('vat_rate', 0)|float %}
+{% set grand_total = payload.get('total', 0)|float %}
+{% set pm_map      = {'cash':'เงินสด','transfer':'โอนเงิน','qr':'QR / PromptPay','card':'บัตรเครดิต/เดบิต'} %}
+{% set pm_label    = pm_map.get(payload.get('payment_method',''), payload.get('payment_method','–')) %}
+
+{# ─── screen toolbar ─── #}
+<div class="d-flex align-items-center mb-3 gap-2 d-print-none">
+  {% if member %}
+  <a href="/web/members/{{ member.id }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i> กลับ
+  </a>
+  {% else %}
+  <a href="/web/members" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i> กลับ
+  </a>
+  {% endif %}
+  <h5 class="mb-0 fw-bold ms-1">
+    <i class="bi bi-receipt-cutoff me-1 text-success"></i>ใบเสร็จรับเงิน #{{ '%05d'|format(receipt.id) }}
+  </h5>
+  <div class="ms-auto d-flex gap-2">
+    {% if member %}
+    <a href="/web/members/{{ member.id }}/new-bill" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-circle me-1"></i>ออกบิลใหม่
+    </a>
+    {% endif %}
+    <button onclick="window.print()" class="btn btn-success btn-sm">
+      <i class="bi bi-printer-fill me-1"></i>พิมพ์
+    </button>
+  </div>
+</div>
+
+{# ═══════════ A4 SHEET (2 copies) ═══════════ #}
+<div class="a4-sheet">
+
+  {% for copy_label in ['ต้นฉบับ', 'สำเนา'] %}
+  <div class="rc{% if loop.first %} rc-top{% endif %}">
+
+    {# ── HEADER ── #}
+    <table class="w-100 hd-table">
+      <tr>
+        {# left: logo + store info #}
+        <td class="hd-left">
+          <table>
+            <tr>
+              <td class="logo-cell">
+                <div class="store-logo">{{ store_name[0]|upper }}</div>
+              </td>
+              <td class="store-info-cell">
+                <div class="store-name">{{ store_name }}</div>
+                {% if store.address %}
+                <div class="si-line">{{ store.address }}</div>
+                {% endif %}
+                <div class="si-line">ทะเบียนการค้าเลขที่ ___________________</div>
+                <div class="si-line">เลขประจำตัวผู้เสียภาษีอากร {{ store.tax_id or '___________________' }}</div>
+                <div class="si-line">โทร. {{ store.phone or '___________________' }}</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+        {# right: document title + number + date + copy badge #}
+        <td class="hd-right">
+          <div class="doc-title">ใบส่งของ / ใบกำกับภาษี</div>
+          <table class="doc-meta">
+            <tr>
+              <td class="dm-label">เลขที่</td>
+              <td class="dm-value fw-bold">{{ '%09d'|format(receipt.id) }}</td>
+            </tr>
+            <tr>
+              <td class="dm-label">วันที่</td>
+              <td class="dm-value">
+                {% if receipt.printed_at %}
+                  {{ receipt.printed_at.strftime('%d/%m/') }}{{ receipt.printed_at.year + 543 }}
+                {% else %}–{% endif %}
+              </td>
+            </tr>
+          </table>
+          <div class="copy-badge copy-{{ 'orig' if loop.first else 'copy' }}">{{ copy_label }}</div>
+        </td>
+      </tr>
+    </table>
+
+    {# ── CUSTOMER INFO ── #}
+    <table class="cust-table w-100">
+      <tr>
+        <td class="cl">ชื่อผู้ซื้อ</td>
+        <td class="cv" colspan="3">
+          <strong>{{ cust_name }}</strong>
+          &nbsp;&nbsp;{{ pm_label }}
+        </td>
+        <td class="cl text-end" style="width:90px">รหัสลูกค้า</td>
+        <td class="cv text-end" style="width:90px">{{ member.member_code if member else '–' }}</td>
+      </tr>
+      <tr>
+        <td class="cl">ที่อยู่</td>
+        <td class="cv" colspan="5">{{ cust_addr or '–' }}</td>
+      </tr>
+      <tr>
+        <td class="cl" style="width:150px">เลขประจำตัวผู้เสียภาษี</td>
+        <td class="cv" style="width:160px">{{ cust_tax or '–' }}</td>
+        <td class="cl" style="width:70px">ทะเบียนรถ</td>
+        <td class="cv" style="width:100px">–</td>
+        <td class="cl text-end">โทรศัพท์</td>
+        <td class="cv text-end">{{ cust_phone or '–' }}</td>
+      </tr>
+      <tr>
+        <td class="cl">หมายเหตุ</td>
+        <td class="cv" colspan="5">{{ payload.get('note') or '–' }}</td>
+      </tr>
+    </table>
+
+    {# ── ITEMS TABLE ── #}
+    <table class="items-table w-100">
+      <thead>
+        <tr>
+          <th style="width:5%;text-align:center">ลำดับ</th>
+          <th style="text-align:center">รายการ</th>
+          <th style="width:11%;text-align:center">จำนวน</th>
+          <th style="width:9%;text-align:center">หน่วย</th>
+          <th style="width:12%;text-align:right">ราคา/หน่วย</th>
+          <th style="width:10%;text-align:right">ส่วนลด</th>
+          <th style="width:13%;text-align:right">รวมเป็นเงิน</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td class="text-center">{{ loop.index }}</td>
+          <td>{{ item.get('name', '') }}</td>
+          <td class="text-center">{{ "%.2f"|format(item.get('qty', 1)|float) }}</td>
+          <td class="text-center text-muted">{{ item.get('unit', '') }}</td>
+          <td class="text-end">{{ "%.2f"|format(item.get('price', 0)|float) }}</td>
+          <td class="text-end text-muted">–</td>
+          <td class="text-end fw-bold">
+            {%- set line = (item.get('qty', 1)|float) * (item.get('price', 0)|float) -%}
+            {{ "%.2f"|format(line) }}
+          </td>
+        </tr>
+        {% endfor %}
+        {# empty filler rows #}
+        {% for _ in range([0, 4 - items|length]|max) %}
+        <tr class="filler">
+          <td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {# ── SUMMARY ── #}
+    <table class="w-100 sum-row-wrap">
+      <tr>
+        <td class="sum-words-cell">
+          <div class="words-box">( {{ amount_text }} )</div>
+        </td>
+        <td class="sum-table-cell">
+          <table class="sum-table">
+            {% if vat_rate > 0 %}
+            <tr>
+              <td class="sl">ราคาสินค้า</td>
+              <td class="sv">{{ "%.2f"|format(subtotal) }}</td>
+            </tr>
+            <tr>
+              <td class="sl">ภาษีมูลค่าเพิ่ม {{ vat_rate|int }}%</td>
+              <td class="sv">{{ "%.2f"|format(vat_amount) }}</td>
+            </tr>
+            <tr class="sum-total-row">
+              <td class="sl fw-bold">จำนวนเงินรวมภาษี</td>
+              <td class="sv fw-bold">{{ "%.2f"|format(grand_total) }}</td>
+            </tr>
+            {% else %}
+            <tr class="sum-total-row">
+              <td class="sl fw-bold">ยอดรวมทั้งหมด</td>
+              <td class="sv fw-bold">{{ "%.2f"|format(grand_total) }}</td>
+            </tr>
+            {% endif %}
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    {# ── SIGNATURES ── #}
+    <table class="w-100 sig-table">
+      <tr>
+        <td class="text-center sig-cell">
+          ผู้รับสินค้า.......................................
+        </td>
+        <td class="text-center sig-cell">
+          ผู้ขาย.......................................
+        </td>
+      </tr>
+    </table>
+
+    <div class="rc-note">
+      กรุณาตรวจสอบใบกำกับภาษี หากเกิน 7 วัน นับจากวันที่ออกใบกำกับภาษี
+      ทาง{{ store_name }}ถือว่าใบกำกับภาษีฉบับนี้ถูกต้องแล้ว
+    </div>
+  </div>{# end .rc #}
+
+  {% if not loop.last %}
+  <div class="rc-divider">✂ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─</div>
+  {% endif %}
+  {% endfor %}
+
+</div>{# end .a4-sheet #}
+
+{# ─── STYLES ─── #}
+<style>
+/* ── base ──────────────────────────────────────── */
+.a4-sheet {
+  width: 210mm;
+  background: #fff;
+  margin: 0 auto 24px;
+  padding: 7mm 9mm;
+  box-sizing: border-box;
+  font-family: 'Sarabun', 'TH SarabunNew', 'Noto Sans Thai', Tahoma, sans-serif;
+  font-size: 10pt;
+  color: #000;
+  box-shadow: 0 2px 20px rgba(0,0,0,.18);
+}
+
+/* ── each copy ──────────────────────────────────── */
+.rc {
+  /* natural height, ~135mm target */
+  overflow: hidden;
+}
+
+/* ── header ─────────────────────────────────────── */
+.hd-table  { border-collapse: collapse; margin-bottom: 3px; }
+.hd-left   { width: 58%; vertical-align: top; }
+.hd-right  { width: 42%; vertical-align: top; text-align: right; }
+
+.logo-cell { width: 58px; vertical-align: middle; padding-right: 8px; }
+.store-logo {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: #1a3a6e; color: #fff;
+  font-size: 22pt; font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+  border: 3px solid #c8a427;
+}
+.store-info-cell { vertical-align: top; }
+.store-name { font-size: 12pt; font-weight: 700; margin-bottom: 1px; }
+.si-line    { font-size: 8.5pt; line-height: 1.45; color: #222; }
+
+.doc-title  { font-size: 12pt; font-weight: 700; color: #1a3a6e; margin-bottom: 3px; }
+.doc-meta   { border-collapse: collapse; margin-left: auto; }
+.dm-label   { font-size: 9pt; padding-right: 6px; color: #555; }
+.dm-value   { font-size: 9pt; }
+
+.copy-badge {
+  display: inline-block; font-size: 14pt; font-weight: 700;
+  margin-top: 4px; padding: 0 7px; border-radius: 3px;
+}
+.copy-orig { color: #c0392b; border: 2px solid #c0392b; }
+.copy-copy { color: #1a6eb5; border: 2px solid #1a6eb5; }
+
+/* ── customer table ────────────────────────────── */
+.cust-table { border-collapse: collapse; font-size: 9pt; margin-bottom: 3px; }
+.cust-table td { padding: 1.5px 4px; border: 1px solid #999; }
+.cl { background: #f0f0f0; font-weight: 600; white-space: nowrap; }
+.cv { background: #fff; }
+
+/* ── items table ────────────────────────────────── */
+.items-table { border-collapse: collapse; font-size: 9pt; margin-bottom: 3px; }
+.items-table th {
+  background: #1a3a6e; color: #fff;
+  padding: 2px 4px; border: 1px solid #0e2857;
+  font-weight: 600;
+}
+.items-table td   { padding: 2px 4px; border: 1px solid #ccc; }
+.items-table .filler td { height: 14px; border-color: #ddd; }
+.items-table tbody tr:nth-child(even):not(.filler) { background: #f7f7f7; }
+
+/* ── summary row ─────────────────────────────────── */
+.sum-row-wrap  { border-collapse: collapse; margin-bottom: 3px; }
+.sum-words-cell { vertical-align: middle; padding-right: 8px; }
+.sum-table-cell { vertical-align: top; text-align: right; }
+.words-box {
+  font-size: 9pt; font-style: italic;
+  border: 1px solid #bbb; background: #fffde7;
+  padding: 3px 6px; min-height: 22px;
+}
+.sum-table    { border-collapse: collapse; float: right; min-width: 210px; }
+.sl { font-size: 9pt; padding: 1.5px 6px 1.5px 4px; border: 1px solid #ccc; background: #f5f5f5; white-space: nowrap; }
+.sv { font-size: 9pt; padding: 1.5px 4px; border: 1px solid #ccc; text-align: right; min-width: 75px; background: #fff; }
+.sum-total-row td { background: #fffde7; }
+
+/* ── signatures ──────────────────────────────────── */
+.sig-table  { border-collapse: collapse; margin-top: 3px; }
+.sig-cell   { font-size: 9pt; padding: 2px 8px; width: 50%; }
+
+/* ── note ────────────────────────────────────────── */
+.rc-note {
+  font-size: 8pt; color: #555; border-top: 1px solid #ccc;
+  padding-top: 2px; margin-top: 2px; line-height: 1.4;
+}
+
+/* ── divider ─────────────────────────────────────── */
+.rc-divider {
+  text-align: center; color: #777; font-size: 8.5pt;
+  margin: 3mm 0; letter-spacing: 1px; border-top: 1px dashed #aaa;
+  padding-top: 2px;
+}
+
+/* ════════════ PRINT ════════════ */
+@media print {
+  @page { size: A4 portrait; margin: 10mm; }
+
+  body * { visibility: hidden !important; }
+  .a4-sheet, .a4-sheet * { visibility: visible !important; }
+  .a4-sheet {
+    position: fixed; inset: 0;
+    width: 100%; height: 100%;
+    padding: 0; margin: 0;
+    box-shadow: none;
+  }
+  .rc       { height: 133mm; overflow: hidden; }
+  .rc-divider { margin: 1mm 0; }
+  nav.navbar, .d-print-none { display: none !important; }
+  .container-fluid { padding: 0 !important; }
+}
+</style>
+{% endblock %}

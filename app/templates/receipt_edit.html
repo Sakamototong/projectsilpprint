@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}แก้ไขใบเสร็จ #{{ '%09d'|format(receipt.id) }}{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4">
+  <a href="/web/receipts/{{ receipt.id }}" class="btn btn-outline-secondary btn-sm me-3">
+    <i class="bi bi-arrow-left"></i> กลับ
+  </a>
+  <h5 class="mb-0 fw-bold">
+    <i class="bi bi-pencil-square me-2 text-warning"></i>แก้ไขใบเสร็จ #{{ '%09d'|format(receipt.id) }}
+  </h5>
+</div>
+
+{% set items  = payload.get('items', []) %}
+{% set pm     = payload.get('payment_method', 'cash') %}
+{% set note   = payload.get('note', '') %}
+{% set vtype  = payload.get('vat_type', 'none') %}
+{% set bp_raw = payload.get('billing_profile') %}
+
+<div class="row g-4">
+  <!-- สินค้า quick-add -->
+  <div class="col-md-4 col-lg-3">
+    {% if products %}
+    <div class="card p-3">
+      <h6 class="fw-bold small text-muted text-uppercase mb-2"><i class="bi bi-fuel-pump me-1"></i>สินค้า / น้ำมัน</h6>
+      {% for cat, prods in (products | groupby("category")) %}
+      <div class="mb-2">
+        <small class="text-muted fw-bold d-block mb-1">{{ {"fuel":"⛽ น้ำมัน","service":"🔧 บริการ","other":"📦 อื่นๆ"}.get(cat, cat) }}</small>
+        {% for p in prods %}
+        <button type="button" class="btn btn-outline-secondary btn-sm w-100 text-start mb-1 quick-add"
+                data-name="{{ p.name }}" data-price="{{ p.price }}" data-unit="{{ p.unit }}">
+          {{ p.name }} <span class="float-end text-primary">฿{{ "%.2f"|format(p.price) }}/{{ p.unit }}</span>
+        </button>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ฟอร์มแก้ไข -->
+  <div class="col-md-8 col-lg-9">
+    <div class="card p-4">
+      <form id="editForm" method="post" action="/web/receipts/{{ receipt.id }}/edit">
+        <input type="hidden" name="items_json" id="items_json">
+
+        <h6 class="fw-bold mb-2 text-muted text-uppercase small"><i class="bi bi-building me-1"></i>ออกในนาม / ที่อยู่ใบเสร็จ</h6>
+        <div class="row g-2 mb-4">
+          <div class="col-sm-8">
+            <select name="billing_profile_id" class="form-select form-select-sm">
+              <option value=""> ออกในนามส่วนตัว (ใช้ชื่อสมาชิก) </option>
+              {% for bp in billing_profiles %}
+              <option value="{{ bp.id }}"
+                {% if bp_raw and bp_raw.get('label') == bp.label %}selected{% endif %}>
+                {{ bp.label }}{% if bp.company_name %}  {{ bp.company_name }}{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <h6 class="fw-bold mb-2 text-muted text-uppercase small"><i class="bi bi-list-ul me-1"></i>รายการสินค้า / บริการ</h6>
+        <div class="table-responsive">
+          <table class="table table-bordered table-sm align-middle">
+            <thead class="table-warning">
+              <tr>
+                <th>รายการ</th>
+                <th style="width:80px" class="text-center">จำนวน</th>
+                <th style="width:70px" class="text-center">หน่วย</th>
+                <th style="width:120px" class="text-center">ราคา/หน่วย (฿)</th>
+                <th style="width:110px" class="text-end">รวม (฿)</th>
+                <th style="width:40px"></th>
+              </tr>
+            </thead>
+            <tbody id="itemsBody">
+              {% for item in items %}
+              <tr class="item-row">
+                <td><input type="text" class="form-control form-control-sm item-name" value="{{ item.get('name','') }}" required></td>
+                <td><input type="number" class="form-control form-control-sm item-qty text-center" value="{{ item.get('qty',1) }}" min="0.001" step="0.001" required></td>
+                <td><input type="text" class="form-control form-control-sm item-unit text-center" value="{{ item.get('unit','ชิ้น') }}"></td>
+                <td><input type="number" class="form-control form-control-sm item-price text-end" value="{{ item.get('price',0) }}" min="0" step="0.01" required></td>
+                <td class="text-end fw-bold item-subtotal">{{ "%.2f"|format((item.get('qty',1)|float)*(item.get('price',0)|float)) }}</td>
+                <td class="text-center">
+                  <button type="button" class="btn btn-outline-danger btn-sm remove-row px-1"><i class="bi bi-trash"></i></button>
+                </td>
+              </tr>
+              {% else %}
+              <tr class="item-row">
+                <td><input type="text" class="form-control form-control-sm item-name" placeholder="ชื่อสินค้า / บริการ" required></td>
+                <td><input type="number" class="form-control form-control-sm item-qty text-center" value="1" min="0.001" step="0.001" required></td>
+                <td><input type="text" class="form-control form-control-sm item-unit text-center" value="ชิ้น"></td>
+                <td><input type="number" class="form-control form-control-sm item-price text-end" value="0.00" min="0" step="0.01" required></td>
+                <td class="text-end fw-bold item-subtotal">0.00</td>
+                <td class="text-center">
+                  <button type="button" class="btn btn-outline-danger btn-sm remove-row px-1"><i class="bi bi-trash"></i></button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <button type="button" class="btn btn-outline-primary btn-sm mb-4" id="addRow">
+          <i class="bi bi-plus-circle me-1"></i>เพิ่มรายการ
+        </button>
+
+        <div class="row g-3">
+          <div class="col-sm-4">
+            <label class="form-label fw-bold small">วิธีชำระเงิน</label>
+            <select name="payment_method" class="form-select form-select-sm">
+              <option value="cash"     {% if pm=='cash'     %}selected{% endif %}> เงินสด</option>
+              <option value="transfer" {% if pm=='transfer' %}selected{% endif %}> โอนเงิน</option>
+              <option value="qr"       {% if pm=='qr'       %}selected{% endif %}> QR / PromptPay</option>
+              <option value="card"     {% if pm=='card'     %}selected{% endif %}> บัตรเครดิต/เดบิต</option>
+            </select>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label fw-bold small">VAT ({{ store.vat_rate or 7 }}%)</label>
+            <select name="vat_type" id="vatType" class="form-select form-select-sm">
+              <option value="none"      {% if vtype=='none'      %}selected{% endif %}>ไม่มี VAT</option>
+              <option value="exclusive" {% if vtype=='exclusive' %}selected{% endif %}>+ VAT {{ store.vat_rate or 7 }}% (แยกออก)</option>
+              <option value="inclusive" {% if vtype=='inclusive' %}selected{% endif %}>รวม VAT {{ store.vat_rate or 7 }}% (ราคานี้รวมแล้ว)</option>
+            </select>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label fw-bold small">หมายเหตุ</label>
+            <input type="text" name="note" class="form-control form-control-sm" value="{{ note }}">
+          </div>
+        </div>
+
+        <div class="card bg-light border mt-4 p-3">
+          <div class="d-flex justify-content-between mb-1 small">
+            <span class="text-muted">ราคาก่อน VAT</span>
+            <span id="subtotalDisplay">฿0.00</span>
+          </div>
+          <div class="d-flex justify-content-between mb-1 small" id="vatRow">
+            <span class="text-muted" id="vatLabel">VAT</span>
+            <span id="vatDisplay">฿0.00</span>
+          </div>
+          <hr class="my-2">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="fs-5 fw-bold">ยอดรวมทั้งหมด</span>
+            <span class="fs-2 fw-bold text-warning" id="grandTotal">฿0.00</span>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-3 justify-content-end">
+          <a href="/web/receipts/{{ receipt.id }}" class="btn btn-outline-secondary">
+            <i class="bi bi-x-circle me-1"></i>ยกเลิก
+          </a>
+          <button type="submit" class="btn btn-warning px-4">
+            <i class="bi bi-save me-1"></i>บันทึกการแก้ไข
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+const VAT_RATE = {{ store.vat_rate or 7 }};
+function calcRow(row) {
+  const qty   = parseFloat(row.querySelector('.item-qty').value)||0;
+  const price = parseFloat(row.querySelector('.item-price').value)||0;
+  row.querySelector('.item-subtotal').textContent = (qty*price).toFixed(2);
+}
+function calcTotal() {
+  let itemSum = 0;
+  document.querySelectorAll('.item-row').forEach(r => {
+    itemSum += (parseFloat(r.querySelector('.item-qty').value)||0)*(parseFloat(r.querySelector('.item-price').value)||0);
+  });
+  const vatType = document.getElementById('vatType').value;
+  let sub, vat, total;
+  if (vatType === 'exclusive') {
+    sub   = itemSum;
+    vat   = sub * VAT_RATE / 100;
+    total = sub + vat;
+    document.getElementById('vatLabel').textContent = 'VAT ' + VAT_RATE + '% (บวกเพิ่ม)';
+    document.getElementById('vatRow').style.opacity = '1';
+  } else if (vatType === 'inclusive') {
+    total = itemSum;
+    sub   = total / (1 + VAT_RATE / 100);
+    vat   = total - sub;
+    document.getElementById('vatLabel').textContent = 'VAT ' + VAT_RATE + '% (รวมอยู่แล้ว)';
+    document.getElementById('vatRow').style.opacity = '1';
+  } else {
+    sub   = itemSum; vat = 0; total = sub;
+    document.getElementById('vatLabel').textContent = 'VAT';
+    document.getElementById('vatRow').style.opacity = '0.3';
+  }
+  document.getElementById('subtotalDisplay').textContent = '฿'+sub.toFixed(2);
+  document.getElementById('vatDisplay').textContent      = '฿'+vat.toFixed(2);
+  document.getElementById('grandTotal').textContent      = '฿'+total.toFixed(2);
+}
+document.getElementById('itemsBody').addEventListener('input', e => {
+  const row = e.target.closest('.item-row');
+  if (row) { calcRow(row); calcTotal(); }
+});
+document.getElementById('vatType').addEventListener('change', calcTotal);
+document.getElementById('addRow').addEventListener('click', function () {
+  const newRow = document.querySelector('.item-row').cloneNode(true);
+  newRow.querySelector('.item-name').value = '';
+  newRow.querySelector('.item-qty').value = '1';
+  newRow.querySelector('.item-price').value = '0.00';
+  newRow.querySelector('.item-unit').value = 'ชิ้น';
+  newRow.querySelector('.item-subtotal').textContent = '0.00';
+  document.getElementById('itemsBody').appendChild(newRow);
+  newRow.querySelector('.item-name').focus();
+});
+document.getElementById('itemsBody').addEventListener('click', e => {
+  if (e.target.closest('.remove-row')) {
+    if (document.querySelectorAll('.item-row').length > 1) { e.target.closest('.item-row').remove(); calcTotal(); }
+  }
+});
+document.querySelectorAll('.quick-add').forEach(btn => {
+  btn.addEventListener('click', function () {
+    let targetRow = document.querySelector('.item-row:last-child');
+    if (targetRow.querySelector('.item-name').value.trim() !== '') {
+      document.getElementById('addRow').click();
+      targetRow = document.querySelector('.item-row:last-child');
+    }
+    targetRow.querySelector('.item-name').value  = this.dataset.name;
+    targetRow.querySelector('.item-price').value = this.dataset.price;
+    targetRow.querySelector('.item-unit').value  = this.dataset.unit;
+    calcRow(targetRow); calcTotal();
+  });
+});
+document.getElementById('editForm').addEventListener('submit', function (e) {
+  const items = [];
+  let valid = true;
+  document.querySelectorAll('.item-row').forEach(r => {
+    const name = r.querySelector('.item-name').value.trim();
+    if (!name) { valid = false; return; }
+    items.push({ name, qty: parseFloat(r.querySelector('.item-qty').value)||1,
+      unit: r.querySelector('.item-unit').value||'ชิ้น',
+      price: parseFloat(r.querySelector('.item-price').value)||0 });
+  });
+  if (!valid || items.length===0) { e.preventDefault(); alert('กรุณากรอกชื่อรายการให้ครบ'); return; }
+  document.getElementById('items_json').value = JSON.stringify(items);
+});
+// Init totals on load
+calcTotal();
+</script>
+{% endblock %}
