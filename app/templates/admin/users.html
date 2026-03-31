@@ -1,0 +1,135 @@
+{% extends "admin/base.html" %}
+{% block title %}จัดการผู้ใช้งาน{% endblock %}
+{% block content %}
+
+{% if flash_msg == 'reset' and flash_data %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  <i class="bi bi-key me-1"></i>รีเซ็ตรหัสผ่านสำเร็จ — รหัสใหม่:
+  <strong class="ms-1 font-monospace fs-5">{{ flash_data }}</strong>
+  <span class="text-muted small ms-2">(แสดงครั้งเดียว โปรดแจ้งผู้ใช้)</span>
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- Filter bar -->
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-body py-2">
+    <form method="get" action="/admin/users" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-1">ร้านค้า</label>
+        <select name="store_id" class="form-select form-select-sm">
+          <option value="">ทั้งหมด</option>
+          {% for s in stores_list %}
+          <option value="{{ s.id }}" {% if store_id_filter == s.id %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold mb-1">บทบาท</label>
+        <select name="role" class="form-select form-select-sm">
+          <option value="">ทั้งหมด</option>
+          <option value="admin" {% if role_filter=='admin' %}selected{% endif %}>admin</option>
+          <option value="user" {% if role_filter=='user' %}selected{% endif %}>user</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold mb-1">สถานะ</label>
+        <select name="active" class="form-select form-select-sm">
+          <option value="">ทั้งหมด</option>
+          <option value="1" {% if active_filter=='1' %}selected{% endif %}>ใช้งาน</option>
+          <option value="0" {% if active_filter=='0' %}selected{% endif %}>ปิดใช้งาน</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-1">ค้นหา</label>
+        <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="ชื่อ / username">
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary btn-sm w-100">
+          <i class="bi bi-search me-1"></i>ค้นหา
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- User Table -->
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-white fw-semibold border-0 pt-3 d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-people me-1 text-primary"></i>ผู้ใช้งาน ({{ users|length }} รายการ)</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>ชื่อ</th>
+          <th>Username</th>
+          <th>ร้านค้า</th>
+          <th>บทบาท</th>
+          <th>สถานะ</th>
+          <th>สมัครเมื่อ</th>
+          <th class="text-end">จัดการ</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for u in users %}
+      <tr class="{% if not u.is_active %}table-secondary{% endif %}">
+        <td class="text-muted">{{ u.id }}</td>
+        <td class="fw-semibold">{{ u.name }}</td>
+        <td class="font-monospace text-muted">{{ u.username }}</td>
+        <td>
+          <a href="/admin/stores/{{ u.store_id }}" class="text-decoration-none">{{ u.store_name }}</a>
+        </td>
+        <td>
+          {% if u.role == 'admin' %}
+          <span class="badge bg-primary">admin</span>
+          {% else %}
+          <span class="badge bg-secondary">user</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if u.is_active %}
+          <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>ใช้งาน</span>
+          {% else %}
+          <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>ปิดใช้งาน</span>
+          {% endif %}
+        </td>
+        <td class="text-muted small">{{ u.created_at.strftime('%d/%m/%Y %H:%M') if u.created_at }}</td>
+        <td class="text-end">
+          <div class="d-flex gap-1 justify-content-end flex-wrap">
+            <!-- Toggle active -->
+            <form method="post" action="/admin/users/{{ u.id }}/toggle">
+              {% if u.is_active %}
+              <button class="btn btn-sm btn-outline-warning" title="ปิดใช้งาน"
+                onclick="return confirm('ปิดการใช้งาน {{ u.name }}?')">
+                <i class="bi bi-pause-circle"></i>
+              </button>
+              {% else %}
+              <button class="btn btn-sm btn-outline-success" title="เปิดใช้งาน">
+                <i class="bi bi-play-circle"></i>
+              </button>
+              {% endif %}
+            </form>
+            <!-- Reset password -->
+            <form method="post" action="/admin/users/{{ u.id }}/reset-password">
+              <button class="btn btn-sm btn-outline-secondary" title="รีเซ็ตรหัสผ่าน"
+                onclick="return confirm('รีเซ็ตรหัสผ่านของ {{ u.name }}?')">
+                <i class="bi bi-key"></i>
+              </button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="8" class="text-center text-muted py-4">
+          <i class="bi bi-inbox me-1"></i>ไม่พบผู้ใช้งาน
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

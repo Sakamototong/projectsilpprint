@@ -10,10 +10,18 @@ from fastapi.templating import Jinja2Templates
 from jose import JWTError
 from sqlalchemy import func
 
+import secrets
+import string
+
 from ..models import (
     SessionLocal,
     PlatformAdmin,
     Store,
+    StaffUser,
+    Member,
+    Product,
+    Receipt,
+    Transaction,
     SubscriptionPlan,
     StoreSubscription,
     SubscriptionInvoice,
@@ -25,6 +33,37 @@ from .auth import (
     require_admin,
     verify_password,
 )
+
+
+def _random_password(length: int = 10) -> str:
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _usage_for_store(store: Store, db) -> dict:
+    """Return current usage counts for a store."""
+    now = _now()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    member_count = db.query(func.count(Member.id)).filter(Member.store_id == store.id).scalar() or 0
+    staff_count = db.query(func.count(StaffUser.id)).filter(StaffUser.store_id == store.id).scalar() or 0
+    product_count = (
+        db.query(func.count(Product.id))
+        .filter(Product.store_id == store.id, Product.is_active == True)
+        .scalar() or 0
+    )
+    receipt_count = (
+        db.query(func.count(Receipt.id))
+        .join(Transaction, Transaction.id == Receipt.transaction_id)
+        .join(Member, Member.id == Transaction.member_id)
+        .filter(Member.store_id == store.id, Receipt.printed_at >= month_start)
+        .scalar() or 0
+    )
+    return {
+        "member_count": member_count,
+        "staff_count": staff_count,
+        "product_count": product_count,
+        "receipt_count": receipt_count,
+    }
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -229,6 +268,24 @@ def admin_store_detail(request: Request, store_id: int):
             .order_by(SubscriptionInvoice.created_at.desc())
             .all()
         )
+        staff_users = (
+            db.query(StaffUser)
+            .filter(StaffUser.store_id == store_id)
+            .order_by(StaffUser.created_at.desc())
+            .all()
+        )
+        usage = _usage_for_store(store, db)
+        # Get active plan limits for this store
+        active_sub = (
+            db.query(StoreSubscription)
+            .filter(StoreSubscription.store_id == store_id, StoreSubscription.status == "active")
+            .order_by(StoreSubscription.started_at.desc())
+            .first()
+        )
+        plan_limits = None
+        if active_sub:
+            plan_limits = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == active_sub.plan_id).first()
+        flash_msg = request.query_params.get("flash")
         return templates.TemplateResponse(
             request,
             "admin/store_detail.html",
@@ -239,6 +296,10 @@ def admin_store_detail(request: Request, store_id: int):
                 "plans": plans,
                 "subscriptions": subscriptions,
                 "invoices": invoices,
+                "staff_users": staff_users,
+                "usage": usage,
+                "plan_limits": plan_limits,
+                "flash_msg": flash_msg,
             },
         )
     finally:
@@ -580,5 +641,623 @@ def admin_subscription_renew(request: Request, sub_id: int):
             store.subscription_status = "active"
         db.commit()
         return RedirectResponse(f"/admin/stores/{sub.store_id}", status_code=302)
+    finally:
+        db.close()
+
+
+# ─── User Management ──────────────────────────────────────────────────────────
+
+@router.get("/users")
+def admin_users(
+    request: Request,
+    store_id: Optional[int] = None,
+    role: Optional[str] = None,
+    active: Optional[str] = None,
+    q: Optional[str] = None,
+):
+    admin_ctx = require_admin(request)
+    if isinstance(admin_ctx, RedirectResponse):
+        return admin_ctx
+    db = SessionLocal()
+    try:
+        query = db.query(StaffUser, Store.name.label("store_name")).join(
+            Store, Store.id == StaffUser.store_id
+        )
+        if store_id:
+            query = query.filter(StaffUser.store_id == store_id)
+        if role:
+            query = query.filter(StaffUser.role == role)
+        if active == "1":
+            query = query.filter(StaffUser.is_active == True)
+        elif active == "0":
+            query = query.filter(StaffUser.is_active == False)
+        if q:
+            query = query.filter(
+                StaffUser.name.ilike(f"%{q}%") | StaffUser.username.ilike(f"%{q}%")
+            )
+        rows = query.order_by(StaffUser.created_at.desc()).all()
+        users = [
+            {
+                "id": u.id,
+                "store_id": u.store_id,
+                "store_name": sname,
+                "name": u.name,
+                "username": u.username,
+                "role": u.role,
+                "is_active": u.is_active,
+                "created_at": u.created_at,
+            }
+            for u, sname in rows
+        ]
+        stores_list = db.query(Store).order_by(Store.name).all()
+        flash_msg = request.query_params.get("flash")
+        flash_data = request.query_params.get("flash_data")
+        return templates.TemplateResponse(
+            request,
+            "admin/users.html",
+            {
+                "admin_ctx": admin_ctx,
+                "active_page": "users",
+                "users": users,
+                "stores_list": stores_list,
+                "store_id_filter": store_id or "",
+                "role_filter": role or "",
+                "active_filter": active or "",
+                "q": q or "",
+                "flash_msg": flash_msg,
+                "flash_data": flash_data,
+            },
+        )
+    finally:
+        db.close()
+
+
+@router.post("/users/{user_id}/toggle")
+def admin_user_toggle(request: Request, user_id: int):
+    admin_ctx = require_admin(request)
+    if isinstance(admin_ctx, RedirectResponse):
+        return admin_ctx
+    db = SessionLocal()
+    try:
+        user = db.query(StaffUser).filter(StaffUser.id == user_id).first()
+        if user:
+            user.is_active = not user.is_active
+            db.commit()
+        referrer = request.headers.get("referer", "/admin/users")
+        return RedirectResponse(referrer, status_code=302)
+    finally:
+        db.close()
+
+
+@router.post("/users/{user_id}/reset-password")
+def admin_user_reset_password(request: Request, user_id: int):
+    admin_ctx = require_admin(request)
+    if isinstance(admin_ctx, RedirectResponse):
+        return admin_ctx
+    db = SessionLocal()
+    try:
+        user = db.query(StaffUser).filter(StaffUser.id == user_id).first()
+        if not user:
+            return RedirectResponse("/admin/users", status_code=302)
+        new_pw = _random_password()
+        user.hashed_password = hash_password(new_pw)
+        db.commit()
+        # Redirect back with new password in query param (one-time display)
+        referrer = request.headers.get("referer", "/admin/users")
+        import urllib.parse
+        base = referrer.split("?")[0]
+        return RedirectResponse(
+            f"{base}?flash=reset&flash_data={urllib.parse.quote(new_pw)}",
+            status_code=302,
+        )
+    finally:
+        db.close()
+
+
+# ─── Usage Overview ───────────────────────────────────────────────────────────
+
+_FREE_LIMITS = {"max_members": 50, "max_staff": 2, "max_receipts_per_month": 100, "max_products": 10}
+
+
+@router.get("/usage")
+def admin_usage(request: Request, q: Optional[str] = None):
+    admin_ctx = require_admin(request)
+    if isinstance(admin_ctx, RedirectResponse):
+        return admin_ctx
+    db = SessionLocal()
+    try:
+        store_query = db.query(Store)
+        if q:
+            store_query = store_query.filter(Store.name.ilike(f"%{q}%"))
+        stores = store_query.order_by(Store.name).all()
+
+        # Build plan map: store_id -> active plan
+        active_subs = (
+            db.query(StoreSubscription, SubscriptionPlan)
+            .join(SubscriptionPlan, SubscriptionPlan.id == StoreSubscription.plan_id)
+            .filter(StoreSubscription.status == "active")
+            .all()
+        )
+        plan_by_store: dict[int, SubscriptionPlan] = {}
+        for sub, plan in active_subs:
+            plan_by_store[sub.store_id] = plan
+
+        rows = []
+        for store in stores:
+            usage = _usage_for_store(store, db)
+            plan = plan_by_store.get(store.id)
+            limits = {
+                "max_members": plan.max_members if plan else _FREE_LIMITS["max_members"],
+                "max_staff": plan.max_staff if plan else _FREE_LIMITS["max_staff"],
+                "max_receipts_per_month": plan.max_receipts_per_month if plan else _FREE_LIMITS["max_receipts_per_month"],
+                "max_products": plan.max_products if plan else _FREE_LIMITS["max_products"],
+            }
+            rows.append({
+                "store": store,
+                "plan_name": plan.name if plan else "Free",
+                "usage": usage,
+                "limits": limits,
+            })
+
+        return templates.TemplateResponse(
+            request,
+            "admin/usage.html",
+            {
+                "admin_ctx": admin_ctx,
+                "active_page": "usage",
+                "rows": rows,
+                "q": q or "",
+            },
+        )
+    finally:
+        db.close()
+
+
+# ─── Reports ──────────────────────────────────────────────────────────────────
+
+def _month_range(year: int, month: int):
+    """Return (start, end) datetime for a given year+month in UTC."""
+    start = datetime(year, month, 1, tzinfo=timezone.utc)
+    if month == 12:
+        end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        end = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+    return start, end
+
+
+@router.get("/reports")
+def admin_reports(request: Request):
+    admin_ctx = require_admin(request)
+    if isinstance(admin_ctx, RedirectResponse):
+        return admin_ctx
+    db = SessionLocal()
+    try:
+        now = _now()
+
+        # ── Platform KPIs ─────────────────────────────────────────────
+        total_stores = db.query(func.count(Store.id)).scalar() or 0
+        active_stores = db.query(func.count(Store.id)).filter(Store.store_status == "active").scalar() or 0
+        total_members = db.query(func.count(Member.id)).scalar() or 0
+        total_transactions = db.query(func.count(Transaction.id)).scalar() or 0
+        total_tx_amount = db.query(func.coalesce(func.sum(Transaction.total), 0)).scalar() or 0
+
+        total_revenue_collected = (
+            db.query(func.coalesce(func.sum(SubscriptionInvoice.amount), 0))
+            .filter(SubscriptionInvoice.status == "paid")
+            .scalar() or 0
+        )
+        total_revenue_pending = (
+            db.query(func.coalesce(func.sum(SubscriptionInvoice.amount), 0))
+            .filter(SubscriptionInvoice.status == "pending")
+            .scalar() or 0
+        )
+        total_revenue_overdue = (
+            db.query(func.coalesce(func.sum(SubscriptionInvoice.amount), 0))
+            .filter(SubscriptionInvoice.status == "overdue")
+            .scalar() or 0
+        )
+
+        # ── Subscription breakdown by plan ────────────────────────────
+        plan_rows = db.query(SubscriptionPlan).filter(SubscriptionPlan.is_active == True).all()
+        plan_breakdown = []
+        for plan in plan_rows:
+            count = (
+                db.query(func.count(StoreSubscription.id))
+                .filter(StoreSubscription.plan_id == plan.id, StoreSubscription.status == "active")
+                .scalar() or 0
+            )
+            plan_breakdown.append({"plan": plan, "count": count})
+        free_count = (
+            db.query(func.count(Store.id))
+            .filter(Store.subscription_status == "free")
+            .scalar() or 0
+        )
+
+        # ── Expiring soon (next 14 days) ──────────────────────────────
+        expiring_subs = (
+            db.query(StoreSubscription, Store.name.label("store_name"))
+            .join(Store, Store.id == StoreSubscription.store_id)
+            .filter(
+                StoreSubscription.status == "active",
+                StoreSubscription.expires_at <= now + timedelta(days=14),
+                StoreSubscription.expires_at >= now,
+            )
+            .order_by(StoreSubscription.expires_at)
+            .all()
+        )
+        expiring = [
+            {"sub": sub, "store_name": sname}
+            for sub, sname in expiring_subs
+        ]
+
+        # ── Monthly billing revenue (last 12 months) ──────────────────
+        monthly_revenue = []
+        for i in range(11, -1, -1):
+            target = now - timedelta(days=i * 30)
+            m_start, m_end = _month_range(target.year, target.month)
+            paid = (
+                db.query(func.coalesce(func.sum(SubscriptionInvoice.amount), 0))
+                .filter(
+                    SubscriptionInvoice.status == "paid",
+                    SubscriptionInvoice.paid_at >= m_start,
+                    SubscriptionInvoice.paid_at < m_end,
+                )
+                .scalar() or 0
+            )
+            pending = (
+                db.query(func.coalesce(func.sum(SubscriptionInvoice.amount), 0))
+                .filter(
+                    SubscriptionInvoice.status.in_(["pending", "overdue"]),
+                    SubscriptionInvoice.created_at >= m_start,
+                    SubscriptionInvoice.created_at < m_end,
+                )
+                .scalar() or 0
+            )
+            monthly_revenue.append({
+                "label": f"{_TH_MONTHS[target.month]} {target.year}",
+                "paid": paid,
+                "pending": pending,
+            })
+
+        # ── Top stores by transaction volume ─────────────────────────
+        top_stores_rows = (
+            db.query(Store, func.count(Transaction.id).label("tx_count"),
+                     func.coalesce(func.sum(Transaction.total), 0).label("tx_total"))
+            .join(Member, Member.store_id == Store.id)
+            .join(Transaction, Transaction.member_id == Member.id)
+            .group_by(Store.id)
+            .order_by(func.sum(Transaction.total).desc())
+            .limit(10)
+            .all()
+        )
+        top_stores = [
+            {"store": s, "tx_count": tc, "tx_total": tt}
+            for s, tc, tt in top_stores_rows
+        ]
+
+        kpis = {
+            "total_stores": total_stores,
+            "active_stores": active_stores,
+            "total_members": total_members,
+            "total_transactions": total_transactions,
+            "total_tx_amount": total_tx_amount,
+            "total_revenue_collected": total_revenue_collected,
+            "total_revenue_pending": total_revenue_pending,
+            "total_revenue_overdue": total_revenue_overdue,
+        }
+        return templates.TemplateResponse(
+            request,
+            "admin/reports.html",
+            {
+                "admin_ctx": admin_ctx,
+                "active_page": "reports",
+                "kpis": kpis,
+                "plan_breakdown": plan_breakdown,
+                "free_count": free_count,
+                "expiring": expiring,
+                "monthly_revenue": monthly_revenue,
+                "top_stores": top_stores,
+                "now_dt": now,
+            },
+        )
+    finally:
+        db.close()
+
+
+@router.get("/reports/store/{store_id}")
+def admin_report_store(request: Request, store_id: int, months: int = 6):
+    admin_ctx = require_admin(request)
+    if isinstance(admin_ctx, RedirectResponse):
+        return admin_ctx
+    db = SessionLocal()
+    try:
+        store = db.query(Store).filter(Store.id == store_id).first()
+        if not store:
+            return RedirectResponse("/admin/reports", status_code=302)
+
+        now = _now()
+
+        # ── Current subscription ───────────────────────────────────────
+        active_sub = (
+            db.query(StoreSubscription, SubscriptionPlan)
+            .join(SubscriptionPlan, SubscriptionPlan.id == StoreSubscription.plan_id)
+            .filter(StoreSubscription.store_id == store_id, StoreSubscription.status == "active")
+            .order_by(StoreSubscription.started_at.desc())
+            .first()
+        )
+        current_sub = active_sub[0] if active_sub else None
+        current_plan = active_sub[1] if active_sub else None
+
+        # ── Invoice summary ───────────────────────────────────────────
+        inv_paid = (
+            db.query(func.coalesce(func.sum(SubscriptionInvoice.amount), 0))
+            .filter(SubscriptionInvoice.store_id == store_id, SubscriptionInvoice.status == "paid")
+            .scalar() or 0
+        )
+        inv_pending = (
+            db.query(func.coalesce(func.sum(SubscriptionInvoice.amount), 0))
+            .filter(SubscriptionInvoice.store_id == store_id, SubscriptionInvoice.status == "pending")
+            .scalar() or 0
+        )
+        inv_overdue = (
+            db.query(func.coalesce(func.sum(SubscriptionInvoice.amount), 0))
+            .filter(SubscriptionInvoice.store_id == store_id, SubscriptionInvoice.status == "overdue")
+            .scalar() or 0
+        )
+        invoices = (
+            db.query(SubscriptionInvoice)
+            .filter(SubscriptionInvoice.store_id == store_id)
+            .order_by(SubscriptionInvoice.created_at.desc())
+            .all()
+        )
+
+        # ── Member stats ──────────────────────────────────────────────
+        month_start_cur, _ = _month_range(now.year, now.month)
+        total_members = (
+            db.query(func.count(Member.id)).filter(Member.store_id == store_id).scalar() or 0
+        )
+        new_members_this_month = (
+            db.query(func.count(Member.id))
+            .filter(Member.store_id == store_id, Member.created_at >= month_start_cur)
+            .scalar() or 0
+        )
+
+        # ── Transaction stats ─────────────────────────────────────────
+        total_tx = (
+            db.query(func.count(Transaction.id))
+            .join(Member, Member.id == Transaction.member_id)
+            .filter(Member.store_id == store_id)
+            .scalar() or 0
+        )
+        total_tx_amount = (
+            db.query(func.coalesce(func.sum(Transaction.total), 0))
+            .join(Member, Member.id == Transaction.member_id)
+            .filter(Member.store_id == store_id)
+            .scalar() or 0
+        )
+
+        # ── Monthly transaction breakdown (last N months) ─────────────
+        monthly_tx = []
+        clamp = min(max(months, 1), 24)
+        for i in range(clamp - 1, -1, -1):
+            target = now - timedelta(days=i * 30)
+            m_start, m_end = _month_range(target.year, target.month)
+            count = (
+                db.query(func.count(Transaction.id))
+                .join(Member, Member.id == Transaction.member_id)
+                .filter(
+                    Member.store_id == store_id,
+                    Transaction.timestamp >= m_start,
+                    Transaction.timestamp < m_end,
+                )
+                .scalar() or 0
+            )
+            total = (
+                db.query(func.coalesce(func.sum(Transaction.total), 0))
+                .join(Member, Member.id == Transaction.member_id)
+                .filter(
+                    Member.store_id == store_id,
+                    Transaction.timestamp >= m_start,
+                    Transaction.timestamp < m_end,
+                )
+                .scalar() or 0
+            )
+            monthly_tx.append({
+                "label": f"{_TH_MONTHS[target.month]} {target.year}",
+                "count": count,
+                "total": total,
+            })
+
+        # ── Staff list ────────────────────────────────────────────────
+        staff_users = (
+            db.query(StaffUser)
+            .filter(StaffUser.store_id == store_id)
+            .order_by(StaffUser.name)
+            .all()
+        )
+
+        # ── Payment method breakdown ──────────────────────────────────
+        pm_rows = (
+            db.query(
+                Transaction.payment_method,
+                func.count(Transaction.id).label("cnt"),
+                func.coalesce(func.sum(Transaction.total), 0).label("total"),
+            )
+            .join(Member, Member.id == Transaction.member_id)
+            .filter(Member.store_id == store_id)
+            .group_by(Transaction.payment_method)
+            .order_by(func.sum(Transaction.total).desc())
+            .all()
+        )
+        payment_methods = [
+            {"method": pm or "ไม่ระบุ", "count": cnt, "total": tot}
+            for pm, cnt, tot in pm_rows
+        ]
+
+        usage = _usage_for_store(store, db)
+        billing_summary = {
+            "paid": inv_paid,
+            "pending": inv_pending,
+            "overdue": inv_overdue,
+            "total": inv_paid + inv_pending + inv_overdue,
+        }
+        member_stats = {
+            "total": total_members,
+            "new_this_month": new_members_this_month,
+        }
+        tx_stats = {
+            "total_count": total_tx,
+            "total_amount": total_tx_amount,
+        }
+        return templates.TemplateResponse(
+            request,
+            "admin/report_store.html",
+            {
+                "admin_ctx": admin_ctx,
+                "active_page": "reports",
+                "store": store,
+                "current_sub": current_sub,
+                "current_plan": current_plan,
+                "billing_summary": billing_summary,
+                "invoices": invoices,
+                "member_stats": member_stats,
+                "tx_stats": tx_stats,
+                "monthly_tx": monthly_tx,
+                "staff_users": staff_users,
+                "payment_methods": payment_methods,
+                "usage": usage,
+                "months": clamp,
+            },
+        )
+    finally:
+        db.close()
+
+
+@router.get("/reports/billing")
+def admin_report_billing(
+    request: Request,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    status: Optional[str] = None,
+):
+    admin_ctx = require_admin(request)
+    if isinstance(admin_ctx, RedirectResponse):
+        return admin_ctx
+    db = SessionLocal()
+    try:
+        now = _now()
+        sel_year = year or now.year
+        sel_month = month  # None means all months in the year
+
+        query = db.query(SubscriptionInvoice, Store.name.label("store_name")).join(
+            Store, Store.id == SubscriptionInvoice.store_id
+        )
+        query = query.filter(
+            func.extract("year", SubscriptionInvoice.created_at) == sel_year
+        )
+        if sel_month:
+            query = query.filter(
+                func.extract("month", SubscriptionInvoice.created_at) == sel_month
+            )
+        if status:
+            query = query.filter(SubscriptionInvoice.status == status)
+        rows = query.order_by(SubscriptionInvoice.created_at.desc()).all()
+
+        invoices = [
+            {
+                "id": inv.id,
+                "store_id": inv.store_id,
+                "store_name": sname,
+                "period_label": inv.period_label,
+                "billing_cycle": inv.billing_cycle,
+                "amount": inv.amount,
+                "status": inv.status,
+                "due_date": inv.due_date,
+                "paid_at": inv.paid_at,
+                "created_at": inv.created_at,
+            }
+            for inv, sname in rows
+        ]
+
+        # ── Summary totals ─────────────────────────────────────────────
+        total_all = sum(r["amount"] for r in invoices)
+        total_paid = sum(r["amount"] for r in invoices if r["status"] == "paid")
+        total_pending = sum(r["amount"] for r in invoices if r["status"] == "pending")
+        total_overdue = sum(r["amount"] for r in invoices if r["status"] == "overdue")
+
+        # ── Per-store rollup for this period ──────────────────────────
+        store_rollup: dict[int, dict] = {}
+        for r in invoices:
+            sid = r["store_id"]
+            if sid not in store_rollup:
+                store_rollup[sid] = {
+                    "store_id": sid,
+                    "store_name": r["store_name"],
+                    "total": 0, "paid": 0, "pending": 0, "overdue": 0, "count": 0,
+                }
+            store_rollup[sid]["total"] += r["amount"]
+            store_rollup[sid][r["status"]] = store_rollup[sid].get(r["status"], 0) + r["amount"]
+            store_rollup[sid]["count"] += 1
+        store_summary = sorted(store_rollup.values(), key=lambda x: x["total"], reverse=True)
+
+        # ── Monthly breakdown for selected year ───────────────────────
+        monthly_breakdown = []
+        for m in range(1, 13):
+            m_start, m_end = _month_range(sel_year, m)
+            paid = (
+                db.query(func.coalesce(func.sum(SubscriptionInvoice.amount), 0))
+                .filter(
+                    SubscriptionInvoice.status == "paid",
+                    SubscriptionInvoice.paid_at >= m_start,
+                    SubscriptionInvoice.paid_at < m_end,
+                )
+                .scalar() or 0
+            )
+            inv_count = (
+                db.query(func.count(SubscriptionInvoice.id))
+                .filter(
+                    func.extract("year", SubscriptionInvoice.created_at) == sel_year,
+                    func.extract("month", SubscriptionInvoice.created_at) == m,
+                )
+                .scalar() or 0
+            )
+            monthly_breakdown.append({
+                "month": m,
+                "label": _TH_MONTHS[m],
+                "paid": paid,
+                "inv_count": inv_count,
+                "is_current": (sel_year == now.year and m == now.month),
+                "is_selected": (sel_month == m),
+            })
+
+        # Available years (range from first invoice to now)
+        first_inv = db.query(func.min(SubscriptionInvoice.created_at)).scalar()
+        first_year = first_inv.year if first_inv else now.year
+        available_years = list(range(first_year, now.year + 1))
+
+        billing_totals = {
+            "total_all": total_all,
+            "total_paid": total_paid,
+            "total_pending": total_pending,
+            "total_overdue": total_overdue,
+            "collection_rate": (total_paid / total_all * 100) if total_all > 0 else 0,
+        }
+        return templates.TemplateResponse(
+            request,
+            "admin/report_billing.html",
+            {
+                "admin_ctx": admin_ctx,
+                "active_page": "reports",
+                "invoices": invoices,
+                "billing_totals": billing_totals,
+                "store_summary": store_summary,
+                "monthly_breakdown": monthly_breakdown,
+                "sel_year": sel_year,
+                "sel_month": sel_month or "",
+                "status_filter": status or "",
+                "available_years": available_years,
+                "now_dt": now,
+            },
+        )
     finally:
         db.close()

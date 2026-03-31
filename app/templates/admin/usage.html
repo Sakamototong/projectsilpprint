@@ -1,0 +1,134 @@
+{% extends "admin/base.html" %}
+{% block title %}ภาพรวมการใช้งาน{% endblock %}
+{% block content %}
+
+<!-- Search bar -->
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-body py-2">
+    <form method="get" action="/admin/usage" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold mb-1">ค้นหาร้านค้า</label>
+        <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="ชื่อร้านค้า">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-search me-1"></i>ค้นหา
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Usage Table -->
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-white fw-semibold border-0 pt-3">
+    <i class="bi bi-bar-chart me-1 text-primary"></i>การใช้งานทั้งหมด ({{ rows|length }} ร้าน)
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th style="min-width:160px">ร้านค้า</th>
+          <th>แผน</th>
+          <th style="min-width:150px">สมาชิก</th>
+          <th style="min-width:150px">Staff</th>
+          <th style="min-width:150px">สินค้า</th>
+          <th style="min-width:150px">ใบเสร็จ/เดือน</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+      {% set u = row.usage %}
+      {% set l = row.limits %}
+      <tr>
+        <td>
+          <div class="fw-semibold">{{ row.store.name }}</div>
+          <div class="text-muted small">{{ row.store.username }}</div>
+        </td>
+        <td>
+          <span class="badge
+            {% if row.plan_name == 'Free' %}bg-light text-dark border
+            {% else %}bg-primary{% endif %}">
+            {{ row.plan_name }}
+          </span>
+          <div class="text-muted small mt-1">
+            {% if row.store.subscription_status == 'active' %}<span class="text-success">●</span> Active
+            {% elif row.store.subscription_status == 'grace' %}<span class="text-warning">●</span> Grace
+            {% elif row.store.subscription_status == 'expired' %}<span class="text-danger">●</span> Expired
+            {% else %}<span class="text-secondary">●</span> Free{% endif %}
+          </div>
+        </td>
+
+        {# Members bar #}
+        {% set m_pct = (u.member_count / l.max_members * 100) if l.max_members > 0 else 0 %}
+        <td>
+          <small class="text-muted">{{ u.member_count }}{% if l.max_members > 0 %}/{{ l.max_members }}{% else %}/∞{% endif %}</small>
+          {% if l.max_members > 0 %}
+          <div class="progress mt-1" style="height:6px">
+            <div class="progress-bar {% if m_pct >= 90 %}bg-danger{% elif m_pct >= 70 %}bg-warning{% else %}bg-success{% endif %}"
+              style="width:{{ [m_pct,100]|min }}%"></div>
+          </div>
+          {% else %}
+          <div class="progress mt-1" style="height:6px"><div class="progress-bar bg-success" style="width:100%"></div></div>
+          {% endif %}
+        </td>
+
+        {# Staff bar #}
+        {% set s_pct = (u.staff_count / l.max_staff * 100) if l.max_staff > 0 else 0 %}
+        <td>
+          <small class="text-muted">{{ u.staff_count }}{% if l.max_staff > 0 %}/{{ l.max_staff }}{% else %}/∞{% endif %}</small>
+          {% if l.max_staff > 0 %}
+          <div class="progress mt-1" style="height:6px">
+            <div class="progress-bar {% if s_pct >= 90 %}bg-danger{% elif s_pct >= 70 %}bg-warning{% else %}bg-success{% endif %}"
+              style="width:{{ [s_pct,100]|min }}%"></div>
+          </div>
+          {% else %}
+          <div class="progress mt-1" style="height:6px"><div class="progress-bar bg-success" style="width:100%"></div></div>
+          {% endif %}
+        </td>
+
+        {# Products bar #}
+        {% set p_pct = (u.product_count / l.max_products * 100) if l.max_products > 0 else 0 %}
+        <td>
+          <small class="text-muted">{{ u.product_count }}{% if l.max_products > 0 %}/{{ l.max_products }}{% else %}/∞{% endif %}</small>
+          {% if l.max_products > 0 %}
+          <div class="progress mt-1" style="height:6px">
+            <div class="progress-bar {% if p_pct >= 90 %}bg-danger{% elif p_pct >= 70 %}bg-warning{% else %}bg-success{% endif %}"
+              style="width:{{ [p_pct,100]|min }}%"></div>
+          </div>
+          {% else %}
+          <div class="progress mt-1" style="height:6px"><div class="progress-bar bg-success" style="width:100%"></div></div>
+          {% endif %}
+        </td>
+
+        {# Receipts/month bar #}
+        {% set r_pct = (u.receipt_count / l.max_receipts_per_month * 100) if l.max_receipts_per_month > 0 else 0 %}
+        <td>
+          <small class="text-muted">{{ u.receipt_count }}{% if l.max_receipts_per_month > 0 %}/{{ l.max_receipts_per_month }}{% else %}/∞{% endif %}</small>
+          {% if l.max_receipts_per_month > 0 %}
+          <div class="progress mt-1" style="height:6px">
+            <div class="progress-bar {% if r_pct >= 90 %}bg-danger{% elif r_pct >= 70 %}bg-warning{% else %}bg-success{% endif %}"
+              style="width:{{ [r_pct,100]|min }}%"></div>
+          </div>
+          {% else %}
+          <div class="progress mt-1" style="height:6px"><div class="progress-bar bg-success" style="width:100%"></div></div>
+          {% endif %}
+        </td>
+
+        <td>
+          <a href="/admin/stores/{{ row.store.id }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-right"></i>
+          </a>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" class="text-center text-muted py-4">ไม่พบข้อมูล</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

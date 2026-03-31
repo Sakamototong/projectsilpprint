@@ -1,0 +1,253 @@
+{% extends "admin/base.html" %}
+{% block title %}รายงานร้าน: {{ store.name }}{% endblock %}
+{% block content %}
+
+<!-- Breadcrumb -->
+<div class="mb-3 d-flex align-items-center gap-2">
+  <a href="/admin/reports" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>รายงานภาพรวม
+  </a>
+  <span class="text-muted">›</span>
+  <span class="fw-semibold">{{ store.name }}</span>
+  <a href="/admin/stores/{{ store.id }}" class="btn btn-sm btn-outline-primary ms-auto">
+    <i class="bi bi-gear me-1"></i>จัดการร้านนี้
+  </a>
+</div>
+
+<!-- Store Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="rounded-circle bg-primary bg-opacity-10 p-3">
+          <i class="bi bi-people fs-4 text-primary"></i>
+        </div>
+        <div>
+          <div class="text-muted small">สมาชิกทั้งหมด</div>
+          <div class="fs-3 fw-bold">{{ "{:,}".format(member_stats.total) }}</div>
+          <div class="text-success small">+{{ member_stats.new_this_month }} เดือนนี้</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="rounded-circle bg-info bg-opacity-10 p-3">
+          <i class="bi bi-receipt fs-4 text-info"></i>
+        </div>
+        <div>
+          <div class="text-muted small">ธุรกรรมทั้งหมด</div>
+          <div class="fs-3 fw-bold">{{ "{:,}".format(tx_stats.total_count) }}</div>
+          <div class="text-muted small">฿{{ "{:,.0f}".format(tx_stats.total_amount) }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="rounded-circle bg-success bg-opacity-10 p-3">
+          <i class="bi bi-cash-stack fs-4 text-success"></i>
+        </div>
+        <div>
+          <div class="text-muted small">ชำระ Subscription แล้ว</div>
+          <div class="fs-3 fw-bold text-success">฿{{ "{:,.0f}".format(billing_summary.paid) }}</div>
+          <div class="text-muted small">
+            <span class="text-warning">฿{{ "{:,.0f}".format(billing_summary.pending) }}</span> รอชำระ
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="rounded-circle
+          {% if store.subscription_status == 'active' %}bg-success{% elif store.subscription_status == 'grace' %}bg-warning{% elif store.subscription_status == 'expired' %}bg-danger{% else %}bg-secondary{% endif %}
+          bg-opacity-10 p-3">
+          <i class="bi bi-card-checklist fs-4
+            {% if store.subscription_status == 'active' %}text-success{% elif store.subscription_status == 'grace' %}text-warning{% elif store.subscription_status == 'expired' %}text-danger{% else %}text-secondary{% endif %}"></i>
+        </div>
+        <div>
+          <div class="text-muted small">แผนปัจจุบัน</div>
+          <div class="fw-bold fs-6">{{ current_plan.name if current_plan else 'Free' }}</div>
+          {% if current_sub %}
+          <div class="text-muted small">หมด {{ current_sub.expires_at.strftime('%d/%m/%Y') if current_sub.expires_at else 'ไม่จำกัด' }}</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Monthly Transactions -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white fw-semibold border-0 pt-3 d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-graph-up me-1 text-primary"></i>ธุรกรรมรายเดือน ({{ months }} เดือนล่าสุด)</span>
+    <div class="d-flex gap-1">
+      <a href="?months=3" class="btn btn-sm {% if months==3 %}btn-primary{% else %}btn-outline-secondary{% endif %}">3ด.</a>
+      <a href="?months=6" class="btn btn-sm {% if months==6 %}btn-primary{% else %}btn-outline-secondary{% endif %}">6ด.</a>
+      <a href="?months=12" class="btn btn-sm {% if months==12 %}btn-primary{% else %}btn-outline-secondary{% endif %}">12ด.</a>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0 text-center align-middle">
+      <thead class="table-light">
+        <tr>
+          <th class="text-start ps-3">เดือน</th>
+          <th>จำนวน</th>
+          <th>ยอดรวม</th>
+          <th>เฉลี่ย/ครั้ง</th>
+          <th style="min-width:120px">กราฟ</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% set max_total = monthly_tx | map(attribute='total') | max %}
+      {% for row in monthly_tx %}
+      <tr>
+        <td class="text-start ps-3 fw-semibold">{{ row.label }}</td>
+        <td>{{ "{:,}".format(row.count) }}</td>
+        <td class="text-success fw-semibold">{% if row.total > 0 %}฿{{ "{:,.0f}".format(row.total) }}{% else %}—{% endif %}</td>
+        <td class="text-muted">{% if row.count > 0 %}฿{{ "{:,.0f}".format(row.total / row.count) }}{% else %}—{% endif %}</td>
+        <td>
+          {% if max_total > 0 %}
+          {% set bar_w = (row.total / max_total * 100) | int %}
+          <div class="progress" style="height:10px">
+            <div class="progress-bar bg-info" style="width:{{ bar_w }}%"></div>
+          </div>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="text-center text-muted py-3">ยังไม่มีข้อมูลธุรกรรม</td></tr>
+      {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-semibold">
+        <tr>
+          <td class="text-start ps-3">รวม</td>
+          <td>{{ "{:,}".format(monthly_tx | sum(attribute='count')) }}</td>
+          <td class="text-success">฿{{ "{:,.0f}".format(monthly_tx | sum(attribute='total')) }}</td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <!-- Payment Method Breakdown -->
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold border-0 pt-3">
+        <i class="bi bi-credit-card me-1 text-success"></i>วิธีการชำระเงิน
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead class="table-light">
+            <tr><th>วิธีชำระ</th><th>จำนวนครั้ง</th><th>ยอดรวม</th><th>%</th></tr>
+          </thead>
+          <tbody>
+          {% set pm_total = payment_methods | sum(attribute='total') %}
+          {% for pm in payment_methods %}
+          {% set pct = (pm.total / pm_total * 100) if pm_total > 0 else 0 %}
+          <tr>
+            <td class="fw-semibold">{{ pm.method }}</td>
+            <td>{{ "{:,}".format(pm.count) }}</td>
+            <td class="text-success">฿{{ "{:,.0f}".format(pm.total) }}</td>
+            <td>
+              <div class="d-flex align-items-center gap-1">
+                <div class="progress flex-grow-1" style="height:6px">
+                  <div class="progress-bar bg-success" style="width:{{ pct | int }}%"></div>
+                </div>
+                <small class="text-muted">{{ "%.0f"|format(pct) }}%</small>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-center text-muted py-3">ยังไม่มีข้อมูล</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Staff List -->
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold border-0 pt-3 d-flex justify-content-between">
+        <span><i class="bi bi-person-badge me-1 text-warning"></i>Staff ({{ staff_users|length }})</span>
+        <a href="/admin/users?store_id={{ store.id }}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-arrow-up-right-square"></i>
+        </a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead class="table-light">
+            <tr><th>ชื่อ</th><th>Username</th><th>บทบาท</th><th>สถานะ</th></tr>
+          </thead>
+          <tbody>
+          {% for u in staff_users %}
+          <tr>
+            <td class="fw-semibold">{{ u.name }}</td>
+            <td class="text-muted font-monospace small">{{ u.username }}</td>
+            <td>
+              {% if u.role == 'admin' %}<span class="badge bg-primary">admin</span>
+              {% else %}<span class="badge bg-secondary">user</span>{% endif %}
+            </td>
+            <td>
+              {% if u.is_active %}<span class="badge bg-success">ใช้งาน</span>
+              {% else %}<span class="badge bg-danger">ปิด</span>{% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-center text-muted py-3">ยังไม่มี staff</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Billing / Invoice History -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white fw-semibold border-0 pt-3 d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-receipt me-1 text-warning"></i>ประวัติใบแจ้งชำระ</span>
+    <div class="small text-muted">
+      ชำระรวม:
+      <span class="text-success fw-semibold">฿{{ "{:,.0f}".format(billing_summary.paid) }}</span> |
+      รอชำระ: <span class="text-warning fw-semibold">฿{{ "{:,.0f}".format(billing_summary.pending) }}</span> |
+      ค้างชำระ: <span class="text-danger fw-semibold">฿{{ "{:,.0f}".format(billing_summary.overdue) }}</span>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>#</th><th>งวด</th><th>รูปแบบ</th><th>จำนวน</th><th>สถานะ</th><th>ครบกำหนด</th><th>ชำระเมื่อ</th></tr>
+      </thead>
+      <tbody>
+      {% for inv in invoices %}
+      <tr>
+        <td class="text-muted">{{ inv.id }}</td>
+        <td>{{ inv.period_label or '—' }}</td>
+        <td>{{ 'รายเดือน' if inv.billing_cycle == 'monthly' else 'รายปี' }}</td>
+        <td class="fw-semibold">฿{{ "{:,.0f}".format(inv.amount) }}</td>
+        <td>
+          {% if inv.status == 'paid' %}<span class="badge bg-success">ชำระแล้ว</span>
+          {% elif inv.status == 'overdue' %}<span class="badge bg-danger">ค้างชำระ</span>
+          {% else %}<span class="badge bg-warning text-dark">รอชำระ</span>{% endif %}
+        </td>
+        <td class="text-muted small">{{ inv.due_date.strftime('%d/%m/%Y') if inv.due_date else '—' }}</td>
+        <td class="text-muted small">{{ inv.paid_at.strftime('%d/%m/%Y') if inv.paid_at else '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="text-center text-muted py-3">ยังไม่มีใบแจ้งชำระ</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

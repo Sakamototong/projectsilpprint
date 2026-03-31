@@ -54,7 +54,14 @@
         </td>
         <td><span class="badge bg-light text-dark border">{{ s.subscription_status }}</span></td>
         <td class="text-muted small">{{ s.created_at.strftime('%d/%m/%Y') if s.created_at }}</td>
-        <td><a href="/admin/stores/{{ s.id }}" class="btn btn-sm btn-outline-primary">ดูรายละเอียด</a></td>
+        <td>
+          <div class="d-flex gap-1">
+            <a href="/admin/stores/{{ s.id }}" class="btn btn-sm btn-outline-primary">ดูรายละเอียด</a>
+            <a href="/admin/reports/store/{{ s.id }}" class="btn btn-sm btn-outline-secondary" title="รายงาน">
+              <i class="bi bi-file-earmark-bar-graph"></i>
+            </a>
+          </div>
+        </td>
       </tr>
       {% else %}
       <tr><td colspan="9" class="text-center text-muted py-4">ไม่พบร้านค้า</td></tr>

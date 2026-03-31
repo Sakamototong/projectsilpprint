@@ -1,0 +1,257 @@
+{% extends "admin/base.html" %}
+{% block title %}รายงานการเรียกเก็บ{% endblock %}
+{% block content %}
+
+<!-- Filter Bar -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="get" action="/admin/reports/billing" class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label small fw-semibold mb-1">ปี</label>
+        <select name="year" class="form-select form-select-sm">
+          {% for y in available_years %}
+          <option value="{{ y }}" {% if y == sel_year %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small fw-semibold mb-1">เดือน</label>
+        <select name="month" class="form-select form-select-sm">
+          <option value="">ทั้งปี</option>
+          {% set month_names = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'] %}
+          {% for m in range(1, 13) %}
+          <option value="{{ m }}" {% if sel_month == m %}selected{% endif %}>{{ month_names[m] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small fw-semibold mb-1">สถานะ</label>
+        <select name="status" class="form-select form-select-sm">
+          <option value="">ทั้งหมด</option>
+          <option value="paid" {% if status_filter=='paid' %}selected{% endif %}>ชำระแล้ว</option>
+          <option value="pending" {% if status_filter=='pending' %}selected{% endif %}>รอชำระ</option>
+          <option value="overdue" {% if status_filter=='overdue' %}selected{% endif %}>ค้างชำระ</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-funnel me-1"></i>กรอง
+        </button>
+      </div>
+      <div class="col-auto ms-auto text-end">
+        <a href="/admin/reports" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-arrow-left me-1"></i>ภาพรวม
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- KPI Summary -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="text-muted small mb-1">ยอดรวมทั้งหมด</div>
+        <div class="fs-4 fw-bold">฿{{ "{:,.0f}".format(billing_totals.total_all) }}</div>
+        <div class="text-muted small">{{ invoices|length }} ใบ</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="text-muted small mb-1">ชำระแล้ว</div>
+        <div class="fs-4 fw-bold text-success">฿{{ "{:,.0f}".format(billing_totals.total_paid) }}</div>
+        <div class="small text-success">{{ "%.1f"|format(billing_totals.collection_rate) }}% collection rate</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="text-muted small mb-1">รอชำระ</div>
+        <div class="fs-4 fw-bold text-warning">฿{{ "{:,.0f}".format(billing_totals.total_pending) }}</div>
+        <div class="small text-muted">{{ invoices | selectattr('status','eq','pending') | list | length }} ใบ</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-3">
+        <div class="text-muted small mb-1">ค้างชำระ</div>
+        <div class="fs-4 fw-bold text-danger">฿{{ "{:,.0f}".format(billing_totals.total_overdue) }}</div>
+        <div class="small text-muted">{{ invoices | selectattr('status','eq','overdue') | list | length }} ใบ</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Monthly Breakdown for Selected Year + Per-Store Summary -->
+<div class="row g-3 mb-3">
+  <!-- Monthly Breakdown -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold border-0 pt-3">
+        <i class="bi bi-calendar3 me-1 text-primary"></i>ยอดชำระรายเดือน ({{ sel_year }})
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead class="table-light">
+            <tr><th>เดือน</th><th>ใบแจ้งชำระ</th><th>ชำระแล้ว</th><th></th></tr>
+          </thead>
+          <tbody>
+          {% set max_paid_m = monthly_breakdown | map(attribute='paid') | max %}
+          {% for m in monthly_breakdown %}
+          <tr class="{% if m.is_current %}table-primary{% elif m.is_selected %}table-warning{% endif %}">
+            <td>
+              <a href="?year={{ sel_year }}&month={{ m.month }}" class="text-decoration-none
+                {% if m.is_current %}fw-bold text-primary{% else %}text-dark{% endif %}">
+                {{ m.label }}
+              </a>
+            </td>
+            <td class="text-muted">{{ m.inv_count }}</td>
+            <td class="{% if m.paid > 0 %}text-success fw-semibold{% else %}text-muted{% endif %}">
+              {% if m.paid > 0 %}฿{{ "{:,.0f}".format(m.paid) }}{% else %}—{% endif %}
+            </td>
+            <td style="width:80px">
+              {% if max_paid_m > 0 %}
+              {% set bw = (m.paid / max_paid_m * 100) | int %}
+              <div class="progress" style="height:6px">
+                <div class="progress-bar bg-success" style="width:{{ bw }}%"></div>
+              </div>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+          <tfoot class="table-light fw-semibold">
+            <tr>
+              <td>รวม</td>
+              <td>{{ monthly_breakdown | sum(attribute='inv_count') }}</td>
+              <td class="text-success">฿{{ "{:,.0f}".format(monthly_breakdown | sum(attribute='paid')) }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Per-Store Summary -->
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold border-0 pt-3">
+        <i class="bi bi-shop me-1 text-info"></i>สรุปตามร้านค้า
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead class="table-light">
+            <tr><th>ร้านค้า</th><th>จำนวนใบ</th><th>ชำระแล้ว</th><th>รอชำระ</th><th>ค้างชำระ</th></tr>
+          </thead>
+          <tbody>
+          {% for s in store_summary %}
+          <tr>
+            <td>
+              <a href="/admin/reports/store/{{ s.store_id }}" class="text-decoration-none fw-semibold">
+                {{ s.store_name }}
+              </a>
+            </td>
+            <td class="text-muted">{{ s.count }}</td>
+            <td class="{% if s.paid > 0 %}text-success fw-semibold{% else %}text-muted{% endif %}">
+              {% if s.paid > 0 %}฿{{ "{:,.0f}".format(s.paid) }}{% else %}—{% endif %}
+            </td>
+            <td class="{% if s.pending > 0 %}text-warning fw-semibold{% else %}text-muted{% endif %}">
+              {% if s.pending > 0 %}฿{{ "{:,.0f}".format(s.pending) }}{% else %}—{% endif %}
+            </td>
+            <td class="{% if s.overdue > 0 %}text-danger fw-semibold{% else %}text-muted{% endif %}">
+              {% if s.overdue > 0 %}฿{{ "{:,.0f}".format(s.overdue) }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted py-3">ไม่มีข้อมูล</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Invoice Detail List -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white fw-semibold border-0 pt-3 d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-list-ul me-1 text-secondary"></i>รายการใบแจ้งชำระ ({{ invoices|length }} รายการ)</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>ร้านค้า</th>
+          <th>งวด</th>
+          <th>รูปแบบ</th>
+          <th>จำนวน</th>
+          <th>สถานะ</th>
+          <th>ครบกำหนด</th>
+          <th>ชำระเมื่อ</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for inv in invoices %}
+      <tr>
+        <td class="text-muted">{{ inv.id }}</td>
+        <td>
+          <a href="/admin/stores/{{ inv.store_id }}" class="text-decoration-none fw-semibold">
+            {{ inv.store_name }}
+          </a>
+        </td>
+        <td>{{ inv.period_label or '—' }}</td>
+        <td>{{ 'รายเดือน' if inv.billing_cycle == 'monthly' else 'รายปี' }}</td>
+        <td class="fw-semibold">฿{{ "{:,.0f}".format(inv.amount) }}</td>
+        <td>
+          {% if inv.status == 'paid' %}<span class="badge bg-success">ชำระแล้ว</span>
+          {% elif inv.status == 'overdue' %}<span class="badge bg-danger">ค้างชำระ</span>
+          {% else %}<span class="badge bg-warning text-dark">รอชำระ</span>{% endif %}
+        </td>
+        <td class="text-muted small">
+          {% if inv.due_date %}
+            {% if inv.status != 'paid' and inv.due_date < now_dt %}
+              <span class="text-danger">{{ inv.due_date.strftime('%d/%m/%Y') }}</span>
+            {% else %}
+              {{ inv.due_date.strftime('%d/%m/%Y') }}
+            {% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td class="text-muted small">{{ inv.paid_at.strftime('%d/%m/%Y') if inv.paid_at else '—' }}</td>
+        <td>
+          {% if inv.status != 'paid' %}
+          <div class="d-flex gap-1">
+            <form method="post" action="/admin/invoices/{{ inv.id }}/confirm-payment">
+              <button class="btn btn-sm btn-success" onclick="return confirm('ยืนยันการชำระ?')">
+                <i class="bi bi-check-lg"></i>
+              </button>
+            </form>
+            {% if inv.status == 'pending' %}
+            <form method="post" action="/admin/invoices/{{ inv.id }}/mark-overdue">
+              <button class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+              </button>
+            </form>
+            {% endif %}
+          </div>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="9" class="text-center text-muted py-4">ไม่พบรายการ</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
