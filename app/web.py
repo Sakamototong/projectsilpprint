@@ -1,9 +1,12 @@
 from pathlib import Path
 from typing import Optional
 import json
+import io
+from datetime import datetime, timezone as _tz, date as _date
+from collections import defaultdict
 
 from fastapi import APIRouter, Request, Form, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -84,6 +87,35 @@ def _get_store(request: Request, db: Session) -> Optional[Store]:
         return None
 
 
+def _get_user_ctx(request: Request, db: Session) -> Optional[dict]:
+    """Return {'store', 'role', 'actor_id', 'actor_name'} or None if unauthenticated."""
+    token = request.cookies.get("access_token")
+    if not token:
+        return None
+    try:
+        payload = decode_token(token)
+        store_id = int(payload.get("sub", 0))
+        store = db.query(Store).filter(Store.id == store_id).first()
+        if not store:
+            return None
+        user_type = payload.get("user_type", "store")
+        if user_type == "store":
+            role = "owner"
+            actor_id = store.id
+            actor_name = f"{store.name} (เจ้าของ)"
+        else:
+            role = payload.get("staff_role", "user")
+            actor_id = payload.get("staff_id")
+            actor_name = payload.get("staff_name", "staff")
+        return {"store": store, "role": role, "actor_id": actor_id, "actor_name": actor_name}
+    except Exception:
+        return None
+
+
+def _is_admin_or_owner(ctx: dict) -> bool:
+    return ctx["role"] in ("owner", "admin")
+
+
 def _get_products(db: Session, store_id: int):
     return db.query(Product).filter(Product.store_id == store_id, Product.is_active == True).all()
 
@@ -105,7 +137,11 @@ def login_post(
 ):
     store = db.query(Store).filter(Store.username == username).first()
     if store and verify_password(password, store.hashed_password):
-        token = create_access_token({"sub": str(store.id), "store_name": store.name})
+        token = create_access_token({
+            "sub": str(store.id),
+            "store_name": store.name,
+            "user_type": "store",
+        })
     else:
         # ลองค้นหาจาก StaffUser
         staff = db.query(StaffUser).filter(
@@ -118,7 +154,14 @@ def login_post(
                 "login.html",
                 {"error": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"},
             )
-        token = create_access_token({"sub": str(staff.store_id), "store_name": staff.store.name})
+        token = create_access_token({
+            "sub": str(staff.store_id),
+            "store_name": staff.store.name,
+            "user_type": "staff",
+            "staff_id": staff.id,
+            "staff_role": staff.role,
+            "staff_name": staff.name,
+        })
     resp = RedirectResponse("/web/members", status_code=302)
     resp.set_cookie("access_token", token, httponly=True, samesite="lax", max_age=28800)
     return resp
@@ -180,9 +223,11 @@ def members_page(
     enrolled: str = None,
     db: Session = Depends(get_db),
 ):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    role = ctx["role"]
 
     query = db.query(Member).filter(Member.store_id == store.id)
     if q:
@@ -201,6 +246,7 @@ def members_page(
             "total": len(members),
             "q": q or "",
             "enrolled": enrolled,
+            "user_role": role,
         },
     )
 
@@ -210,11 +256,12 @@ def members_page(
 # ──────────────────────────────────────────
 @router.get("/enroll", response_class=HTMLResponse)
 def enroll_page(request: Request, db: Session = Depends(get_db)):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
     return templates.TemplateResponse(
-        request, "enroll.html", {"store_name": store.name}
+        request, "enroll.html", {"store_name": store.name, "user_role": ctx["role"]}
     )
 
 
@@ -229,9 +276,11 @@ def enroll_post(
     tier: str = Form("general"),
     db: Session = Depends(get_db),
 ):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    role = ctx["role"]
 
     # ตรวจสอบเบอร์ซ้ำในร้านเดียวกัน
     if phone:
@@ -246,6 +295,7 @@ def enroll_post(
                 "enroll.html",
                 {
                     "store_name": store.name,
+                    "user_role": role,
                     "error": f"เบอร์ {phone} มีอยู่ในระบบแล้ว",
                     "form": {
                         "name": name,
@@ -280,9 +330,11 @@ def enroll_post(
 # ──────────────────────────────────────────
 @router.get("/members/{member_id}", response_class=HTMLResponse)
 def member_detail(request: Request, member_id: int, db: Session = Depends(get_db)):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    role = ctx["role"]
     member = (
         db.query(Member)
         .filter(Member.id == member_id, Member.store_id == store.id)
@@ -293,7 +345,7 @@ def member_detail(request: Request, member_id: int, db: Session = Depends(get_db
     receipts = (
         db.query(Receipt)
         .join(Transaction)
-        .filter(Transaction.member_id == member_id)
+        .filter(Transaction.member_id == member_id, Receipt.deleted_at == None)
         .order_by(Receipt.printed_at.desc())
         .limit(20)
         .all()
@@ -302,7 +354,7 @@ def member_detail(request: Request, member_id: int, db: Session = Depends(get_db
     return templates.TemplateResponse(
         request,
         "member_detail.html",
-        {"store_name": store.name, "member": member, "receipts": receipts, "billing_profiles": billing_profiles},
+        {"store_name": store.name, "member": member, "receipts": receipts, "billing_profiles": billing_profiles, "user_role": role},
     )
 
 
@@ -311,9 +363,11 @@ def member_detail(request: Request, member_id: int, db: Session = Depends(get_db
 # ──────────────────────────────────────────
 @router.get("/members/{member_id}/new-bill", response_class=HTMLResponse)
 def new_bill_page(request: Request, member_id: int, db: Session = Depends(get_db)):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    role = ctx["role"]
     member = (
         db.query(Member)
         .filter(Member.id == member_id, Member.store_id == store.id)
@@ -330,6 +384,7 @@ def new_bill_page(request: Request, member_id: int, db: Session = Depends(get_db
             "member": member,
             "billing_profiles": billing_profiles,
             "products": products,
+            "user_role": role,
         }
     )
 
@@ -345,9 +400,10 @@ def new_bill_post(
     vat_type: str = Form("none"),
     db: Session = Depends(get_db),
 ):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
     member = (
         db.query(Member)
         .filter(Member.id == member_id, Member.store_id == store.id)
@@ -421,6 +477,8 @@ def new_bill_post(
                 "label": bp.label if bp else None,
             } if bp else None,
         },
+        created_by_name=ctx["actor_name"],
+        created_by_id=ctx["actor_id"],
     )
     db.add(receipt)
     db.commit()
@@ -433,9 +491,11 @@ def new_bill_post(
 
 @router.get("/receipts/{receipt_id}", response_class=HTMLResponse)
 def receipt_view(request: Request, receipt_id: int, db: Session = Depends(get_db)):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    role = ctx["role"]
     receipt = db.query(Receipt).filter(Receipt.id == receipt_id).first()
     if not receipt:
         return RedirectResponse("/web/members", status_code=302)
@@ -464,6 +524,8 @@ def receipt_view(request: Request, receipt_id: int, db: Session = Depends(get_db
             "payload": payload,
             "points_earned": points_earned,
             "amount_text": amount_text,
+            "user_role": role,
+            "is_deleted": receipt.deleted_at is not None,
         },
     )
 
@@ -473,12 +535,17 @@ def receipt_view(request: Request, receipt_id: int, db: Session = Depends(get_db
 # ──────────────────────────────────────────
 @router.get("/receipts/{receipt_id}/edit", response_class=HTMLResponse)
 def receipt_edit_page(request: Request, receipt_id: int, db: Session = Depends(get_db)):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    role = ctx["role"]
     receipt = db.query(Receipt).filter(Receipt.id == receipt_id).first()
     if not receipt:
         return RedirectResponse("/web/members", status_code=302)
+    # ไม่อนุญาตแก้บิลที่ถูกลบแล้ว
+    if receipt.deleted_at:
+        return RedirectResponse(f"/web/receipts/{receipt_id}", status_code=302)
     tx = receipt.transaction
     member = None
     if tx and tx.member_id:
@@ -496,6 +563,7 @@ def receipt_edit_page(request: Request, receipt_id: int, db: Session = Depends(g
         "payload": payload,
         "billing_profiles": billing_profiles,
         "products": products,
+        "user_role": role,
     })
 
 
@@ -510,16 +578,22 @@ def receipt_edit_post(
     vat_type: str = Form("none"),
     db: Session = Depends(get_db),
 ):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
     receipt = db.query(Receipt).filter(Receipt.id == receipt_id).first()
     if not receipt:
         return RedirectResponse("/web/members", status_code=302)
+    if receipt.deleted_at:
+        return RedirectResponse(f"/web/receipts/{receipt_id}", status_code=302)
     tx = receipt.transaction
     member = db.query(Member).filter(Member.id == tx.member_id, Member.store_id == store.id).first() if tx else None
     if not member:
         return RedirectResponse("/web/members", status_code=302)
+
+    # บันทึก payload เก่าก่อนแก้ไข
+    old_payload = dict(receipt.raw_payload or {})
 
     # Reverse old points
     old_points = (receipt.raw_payload or {}).get("points_earned", 0)
@@ -574,6 +648,26 @@ def receipt_edit_post(
             "label": bp.label if bp else None,
         } if bp else None,
     }
+
+    # บันทึก edit log
+    edit_changes: dict = {}
+    if abs(old_payload.get("total", 0) - total) > 0.005:
+        edit_changes["total"] = {"old": old_payload.get("total", 0), "new": total}
+    if old_payload.get("payment_method", "") != payment_method:
+        edit_changes["payment_method"] = {"old": old_payload.get("payment_method", ""), "new": payment_method}
+    old_items = old_payload.get("items", [])
+    if json.dumps(old_items, sort_keys=True) != json.dumps(items, sort_keys=True):
+        edit_changes["items"] = {"old_count": len(old_items), "new_count": len(items)}
+    edit_entry = {
+        "at": datetime.now(_tz.utc).isoformat(),
+        "by_name": ctx["actor_name"],
+        "by_id": ctx["actor_id"],
+        "changes": edit_changes,
+    }
+    current_log = list(receipt.edit_log or [])
+    current_log.append(edit_entry)
+    receipt.edit_log = current_log
+
     db.add(tx)
     db.add(receipt)
     db.commit()
@@ -585,21 +679,30 @@ def receipt_edit_post(
 
 @router.post("/receipts/{receipt_id}/delete")
 def receipt_delete(request: Request, receipt_id: int, db: Session = Depends(get_db)):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    if not _is_admin_or_owner(ctx):
+        return RedirectResponse("/web/members", status_code=302)
+    store = ctx["store"]
     receipt = db.query(Receipt).filter(Receipt.id == receipt_id).first()
     if not receipt:
         return RedirectResponse("/web/members", status_code=302)
     tx = receipt.transaction
     member_id = tx.member_id if tx else None
+    # ตรวจสอบว่าเป็นสมาชิกของร้านนี้
+    if member_id:
+        member = db.query(Member).filter(Member.id == member_id, Member.store_id == store.id).first()
+        if not member:
+            return RedirectResponse("/web/members", status_code=302)
     # Reverse points
     old_points = (receipt.raw_payload or {}).get("points_earned", 0)
     if member_id and old_points:
         MemberService.add_points(db, member_id, -old_points)
-    db.delete(receipt)
-    if tx:
-        db.delete(tx)
+    # Soft delete — เก็บประวัติการลบ
+    receipt.deleted_at = datetime.now(_tz.utc)
+    receipt.deleted_by_name = ctx["actor_name"]
+    receipt.deleted_by_id = ctx["actor_id"]
     db.commit()
     if member_id:
         return RedirectResponse(f"/web/members/{member_id}", status_code=302)
@@ -611,20 +714,22 @@ def receipt_delete(request: Request, receipt_id: int, db: Session = Depends(get_
 # ──────────────────────────────────────────
 @router.get("/members/{member_id}/edit", response_class=HTMLResponse)
 def member_edit_page(request: Request, member_id: int, db: Session = Depends(get_db)):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    role = ctx["role"]
     member = db.query(Member).filter(Member.id == member_id, Member.store_id == store.id).first()
     if not member:
         return RedirectResponse("/web/members", status_code=302)
     receipts_count = (
         db.query(Receipt)
         .join(Transaction)
-        .filter(Transaction.member_id == member_id)
+        .filter(Transaction.member_id == member_id, Receipt.deleted_at == None)
         .count()
     )
     return templates.TemplateResponse(request, "edit_member.html", {
-        "store_name": store.name, "member": member, "receipts_count": receipts_count,
+        "store_name": store.name, "member": member, "receipts_count": receipts_count, "user_role": role,
     })
 
 
@@ -640,9 +745,11 @@ def member_edit_post(
     tier: str = Form("general"),
     db: Session = Depends(get_db),
 ):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    role = ctx["role"]
     member = db.query(Member).filter(Member.id == member_id, Member.store_id == store.id).first()
     if not member:
         return RedirectResponse("/web/members", status_code=302)
@@ -657,6 +764,7 @@ def member_edit_post(
             return templates.TemplateResponse(request, "edit_member.html", {
                 "store_name": store.name,
                 "member": member,
+                "user_role": role,
                 "error": f"เบอร์ {phone} มีอยู่ในระบบแล้ว (สมาชิก {dup.name})",
             })
     member.name = name
@@ -671,9 +779,12 @@ def member_edit_post(
 
 @router.post("/members/{member_id}/delete")
 def member_delete(request: Request, member_id: int, db: Session = Depends(get_db)):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    if not _is_admin_or_owner(ctx):
+        return RedirectResponse(f"/web/members/{member_id}", status_code=302)
+    store = ctx["store"]
     member = db.query(Member).filter(Member.id == member_id, Member.store_id == store.id).first()
     if member:
         # ลบใบเสร็จและ transaction ที่เกี่ยวข้อง
@@ -697,9 +808,10 @@ def add_points_post(
     points: int = Form(...),
     db: Session = Depends(get_db),
 ):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
     member = (
         db.query(Member)
         .filter(Member.id == member_id, Member.store_id == store.id)
@@ -716,15 +828,16 @@ def add_points_post(
 # ──────────────────────────────────────────
 @router.get("/members/{member_id}/billing-profiles", response_class=HTMLResponse)
 def billing_profiles_page(request: Request, member_id: int, db: Session = Depends(get_db)):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
     member = db.query(Member).filter(Member.id == member_id, Member.store_id == store.id).first()
     if not member:
         return RedirectResponse("/web/members", status_code=302)
     profiles = db.query(BillingProfile).filter(BillingProfile.member_id == member_id).all()
     return templates.TemplateResponse(request, "billing_profiles.html", {
-        "store_name": store.name, "member": member, "profiles": profiles,
+        "store_name": store.name, "member": member, "profiles": profiles, "user_role": ctx["role"],
     })
 
 
@@ -740,9 +853,10 @@ def billing_profiles_post(
     is_default: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
     member = db.query(Member).filter(Member.id == member_id, Member.store_id == store.id).first()
     if not member:
         return RedirectResponse("/web/members", status_code=302)
@@ -761,9 +875,10 @@ def billing_profiles_post(
 
 @router.post("/members/{member_id}/billing-profiles/{bp_id}/delete")
 def billing_profile_delete(request: Request, member_id: int, bp_id: int, db: Session = Depends(get_db)):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
     bp = db.query(BillingProfile).filter(BillingProfile.id == bp_id, BillingProfile.member_id == member_id).first()
     if bp:
         db.delete(bp)
@@ -776,12 +891,14 @@ def billing_profile_delete(request: Request, member_id: int, bp_id: int, db: Ses
 # ──────────────────────────────────────────
 @router.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request, db: Session = Depends(get_db)):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
-    staff_list = db.query(StaffUser).filter(StaffUser.store_id == store.id).all()
+    if not _is_admin_or_owner(ctx):
+        return RedirectResponse("/web/members", status_code=302)
+    store = ctx["store"]
     return templates.TemplateResponse(request, "store_settings.html", {
-        "store_name": store.name, "store": store, "staff_list": staff_list,
+        "store_name": store.name, "store": store, "user_role": ctx["role"],
     })
 
 
@@ -797,9 +914,12 @@ def settings_profile_post(
     include_vat: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    if not _is_admin_or_owner(ctx):
+        return RedirectResponse("/web/members", status_code=302)
+    store = ctx["store"]
     store.name = store_name
     store.address = address or None
     store.tax_id = tax_id or None
@@ -819,32 +939,14 @@ def settings_staff_add(
     password: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    store = _get_store(request, db)
-    if not store:
-        return RedirectResponse("/web/login", status_code=302)
-    if db.query(StaffUser).filter(StaffUser.username == username).first() or \
-       db.query(Store).filter(Store.username == username).first():
-        staff_list = db.query(StaffUser).filter(StaffUser.store_id == store.id).all()
-        return templates.TemplateResponse(request, "store_settings.html", {
-            "store_name": store.name, "store": store, "staff_list": staff_list,
-            "staff_error": f"username '{username}' ถูกใช้งานแล้ว",
-        })
-    su = StaffUser(store_id=store.id, name=name, username=username, hashed_password=hash_password(password))
-    db.add(su)
-    db.commit()
-    return RedirectResponse("/web/settings?staff_added=1", status_code=302)
+    # Route kept for backward compat — redirects to /web/staff
+    return RedirectResponse("/web/staff", status_code=302)
 
 
 @router.post("/settings/staff/{staff_id}/delete")
 def settings_staff_delete(request: Request, staff_id: int, db: Session = Depends(get_db)):
-    store = _get_store(request, db)
-    if not store:
-        return RedirectResponse("/web/login", status_code=302)
-    su = db.query(StaffUser).filter(StaffUser.id == staff_id, StaffUser.store_id == store.id).first()
-    if su:
-        db.delete(su)
-        db.commit()
-    return RedirectResponse("/web/settings", status_code=302)
+    # Route kept for backward compat — redirects to /web/staff
+    return RedirectResponse("/web/staff", status_code=302)
 
 
 # ──────────────────────────────────────────
@@ -852,13 +954,44 @@ def settings_staff_delete(request: Request, staff_id: int, db: Session = Depends
 # ──────────────────────────────────────────
 @router.get("/products", response_class=HTMLResponse)
 def products_page(request: Request, db: Session = Depends(get_db)):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
     products = db.query(Product).filter(Product.store_id == store.id).order_by(Product.category, Product.name).all()
     return templates.TemplateResponse(request, "products.html", {
-        "store_name": store.name, "products": products,
+        "store_name": store.name, "products": products, "user_role": ctx["role"],
     })
+
+
+@router.post("/products/batch-price")
+def product_batch_price(
+    request: Request,
+    prices_json: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """อัพเดทราคาหลายรายการพร้อมกัน — ทุก role ทำได้"""
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    try:
+        prices: dict = json.loads(prices_json)  # {str(product_id): price}
+    except (ValueError, TypeError):
+        return RedirectResponse("/web/products?saved=1", status_code=302)
+    for pid_str, price_val in prices.items():
+        try:
+            pid = int(pid_str)
+            price = float(price_val)
+            if price < 0:
+                continue
+            p = db.query(Product).filter(Product.id == pid, Product.store_id == store.id).first()
+            if p:
+                p.price = round(price, 2)
+        except (ValueError, TypeError):
+            continue
+    db.commit()
+    return RedirectResponse("/web/products?saved=1", status_code=302)
 
 
 @router.post("/products/add")
@@ -870,9 +1003,12 @@ def product_add(
     category: str = Form("fuel"),
     db: Session = Depends(get_db),
 ):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    if not _is_admin_or_owner(ctx):
+        return RedirectResponse("/web/products", status_code=302)
+    store = ctx["store"]
     p = Product(store_id=store.id, name=name, unit=unit, price=price, category=category)
     db.add(p)
     db.commit()
@@ -890,24 +1026,558 @@ def product_edit(
     is_active: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
     p = db.query(Product).filter(Product.id == product_id, Product.store_id == store.id).first()
     if p:
-        p.name = name; p.unit = unit; p.price = price
-        p.category = category; p.is_active = bool(is_active)
+        # user role can only update price; admin/owner can update all fields
+        if _is_admin_or_owner(ctx):
+            p.name = name; p.unit = unit; p.category = category; p.is_active = bool(is_active)
+        p.price = price
         db.commit()
     return RedirectResponse("/web/products?saved=1", status_code=302)
 
 
 @router.post("/products/{product_id}/delete")
 def product_delete(request: Request, product_id: int, db: Session = Depends(get_db)):
-    store = _get_store(request, db)
-    if not store:
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
         return RedirectResponse("/web/login", status_code=302)
+    if not _is_admin_or_owner(ctx):
+        return RedirectResponse("/web/products", status_code=302)
+    store = ctx["store"]
     p = db.query(Product).filter(Product.id == product_id, Product.store_id == store.id).first()
     if p:
         db.delete(p)
         db.commit()
     return RedirectResponse("/web/products", status_code=302)
+
+
+# ──────────────────────────────────────────
+# จัดการผู้ใช้งาน (Staff Management)  — admin / owner only
+# ──────────────────────────────────────────
+STAFF_LIMIT = 10  # จำนวน staff สูงสุดต่อร้าน (ไม่รวม owner)
+
+
+@router.get("/staff", response_class=HTMLResponse)
+def staff_list_page(request: Request, db: Session = Depends(get_db)):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    if not _is_admin_or_owner(ctx):
+        return RedirectResponse("/web/members", status_code=302)
+    store = ctx["store"]
+    staff_list = db.query(StaffUser).filter(StaffUser.store_id == store.id).order_by(StaffUser.id).all()
+    return templates.TemplateResponse(request, "staff.html", {
+        "store_name": store.name,
+        "user_role": ctx["role"],
+        "staff_list": staff_list,
+        "staff_count": len(staff_list),
+        "staff_limit": STAFF_LIMIT,
+    })
+
+
+@router.get("/staff/new", response_class=HTMLResponse)
+def staff_new_page(request: Request, db: Session = Depends(get_db)):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    if not _is_admin_or_owner(ctx):
+        return RedirectResponse("/web/members", status_code=302)
+    store = ctx["store"]
+    staff_count = db.query(StaffUser).filter(StaffUser.store_id == store.id).count()
+    return templates.TemplateResponse(request, "staff_form.html", {
+        "store_name": store.name,
+        "user_role": ctx["role"],
+        "staff_count": staff_count,
+        "staff_limit": STAFF_LIMIT,
+        "action": "new",
+    })
+
+
+@router.post("/staff/generate")
+def staff_generate(request: Request, db: Session = Depends(get_db)):
+    """สร้าง staff users อัตโนมัติให้ครบ STAFF_LIMIT คน"""
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    if not _is_admin_or_owner(ctx):
+        return RedirectResponse("/web/members", status_code=302)
+    store = ctx["store"]
+
+    existing = db.query(StaffUser).filter(StaffUser.store_id == store.id).all()
+    current_count = len(existing)
+    slots_left = STAFF_LIMIT - current_count
+    if slots_left <= 0:
+        return RedirectResponse("/web/staff?full=1", status_code=302)
+
+    # หา prefix สั้น จาก store username (ไม่เกิน 6 ตัวอักษร)
+    prefix = store.username[:6].lower()
+    generated = []
+
+    for n in range(1, STAFF_LIMIT + 1):
+        if len(generated) >= slots_left:
+            break
+        username = f"{prefix}{n:02d}"
+        password = f"{prefix}{n:02d}"
+        # ตรวจว่า username ซ้ำไหม
+        if db.query(StaffUser).filter(StaffUser.username == username).first():
+            continue
+        if db.query(Store).filter(Store.username == username).first():
+            continue
+        su = StaffUser(
+            store_id=store.id,
+            name=f"User {n:02d}",
+            username=username,
+            hashed_password=hash_password(password),
+            role="user",
+        )
+        db.add(su)
+        generated.append({"name": f"User {n:02d}", "username": username, "password": password})
+
+    db.commit()
+
+    # โหลด staff list ใหม่
+    staff_list = db.query(StaffUser).filter(StaffUser.store_id == store.id).order_by(StaffUser.id).all()
+    return templates.TemplateResponse(request, "staff.html", {
+        "store_name": store.name,
+        "user_role": ctx["role"],
+        "staff_list": staff_list,
+        "staff_count": len(staff_list),
+        "staff_limit": STAFF_LIMIT,
+        "generated_creds": generated,
+    })
+
+
+@router.post("/staff/new")
+def staff_new_post(
+    request: Request,
+    name: str = Form(...),
+    username: str = Form(...),
+    password: str = Form(...),
+    role: str = Form("user"),
+    db: Session = Depends(get_db),
+):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    if not _is_admin_or_owner(ctx):
+        return RedirectResponse("/web/members", status_code=302)
+    store = ctx["store"]
+
+    if role not in ("admin", "user"):
+        role = "user"
+
+    staff_count = db.query(StaffUser).filter(StaffUser.store_id == store.id).count()
+
+    def _render_new_form(error: str):
+        return templates.TemplateResponse(request, "staff_form.html", {
+            "store_name": store.name,
+            "user_role": ctx["role"],
+            "staff_count": staff_count,
+            "staff_limit": STAFF_LIMIT,
+            "action": "new",
+            "form": {"name": name, "username": username, "role": role},
+            "error": error,
+        })
+
+    if staff_count >= STAFF_LIMIT:
+        return _render_new_form(f"ถึงจำนวนผู้ใช้งานสูงสุดแล้ว ({STAFF_LIMIT} คน)")
+
+    if db.query(StaffUser).filter(StaffUser.username == username).first() or \
+       db.query(Store).filter(Store.username == username).first():
+        return _render_new_form(f"username '{username}' ถูกใช้งานแล้ว")
+
+    if len(password) < 6:
+        return _render_new_form("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร")
+
+    su = StaffUser(
+        store_id=store.id,
+        name=name,
+        username=username,
+        hashed_password=hash_password(password),
+        role=role,
+    )
+    db.add(su)
+    db.commit()
+    return RedirectResponse("/web/staff?added=1", status_code=302)
+
+
+@router.get("/staff/{staff_id}/edit", response_class=HTMLResponse)
+def staff_edit_page(request: Request, staff_id: int, db: Session = Depends(get_db)):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    if not _is_admin_or_owner(ctx):
+        return RedirectResponse("/web/members", status_code=302)
+    store = ctx["store"]
+    su = db.query(StaffUser).filter(StaffUser.id == staff_id, StaffUser.store_id == store.id).first()
+    if not su:
+        return RedirectResponse("/web/staff", status_code=302)
+    return templates.TemplateResponse(request, "staff_form.html", {
+        "store_name": store.name,
+        "user_role": ctx["role"],
+        "action": "edit",
+        "staff": su,
+        "form": {"name": su.name, "username": su.username, "role": su.role, "is_active": su.is_active},
+    })
+
+
+@router.post("/staff/{staff_id}/edit")
+def staff_edit_post(
+    request: Request,
+    staff_id: int,
+    name: str = Form(...),
+    username: str = Form(...),
+    password: str = Form(""),
+    role: str = Form("user"),
+    is_active: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    if not _is_admin_or_owner(ctx):
+        return RedirectResponse("/web/members", status_code=302)
+    store = ctx["store"]
+    su = db.query(StaffUser).filter(StaffUser.id == staff_id, StaffUser.store_id == store.id).first()
+    if not su:
+        return RedirectResponse("/web/staff", status_code=302)
+
+    if role not in ("admin", "user"):
+        role = "user"
+
+    def _render_edit_form(error: str):
+        return templates.TemplateResponse(request, "staff_form.html", {
+            "store_name": store.name,
+            "user_role": ctx["role"],
+            "action": "edit",
+            "staff": su,
+            "form": {"name": name, "username": username, "role": role, "is_active": bool(is_active)},
+            "error": error,
+        })
+
+    dup_staff = db.query(StaffUser).filter(StaffUser.username == username, StaffUser.id != staff_id).first()
+    dup_store = db.query(Store).filter(Store.username == username).first()
+    if dup_staff or dup_store:
+        return _render_edit_form(f"username '{username}' ถูกใช้งานแล้ว")
+
+    if password and len(password) < 6:
+        return _render_edit_form("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร")
+
+    su.name = name
+    su.username = username
+    su.role = role
+    su.is_active = bool(is_active)
+    if password:
+        su.hashed_password = hash_password(password)
+    db.commit()
+    return RedirectResponse("/web/staff?updated=1", status_code=302)
+
+
+@router.post("/staff/{staff_id}/delete")
+def staff_delete(request: Request, staff_id: int, db: Session = Depends(get_db)):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    if not _is_admin_or_owner(ctx):
+        return RedirectResponse("/web/members", status_code=302)
+    store = ctx["store"]
+    su = db.query(StaffUser).filter(StaffUser.id == staff_id, StaffUser.store_id == store.id).first()
+    if su:
+        su.is_active = False  # soft-delete
+        db.commit()
+    return RedirectResponse("/web/staff?deleted=1", status_code=302)
+
+
+# ──────────────────────────────────────────
+# หน้าสรุปยอดขาย (Summary / Dashboard)
+# ──────────────────────────────────────────
+
+def _summary_query(db: Session, store_id: int, start: datetime, end: datetime):
+    """คืนค่า list ของ (timestamp, total, payment_method) สำหรับใบเสร็จที่ไม่ถูกลบ"""
+    from .models import Member as _Member
+    return (
+        db.query(Transaction.timestamp, Transaction.total, Transaction.payment_method)
+        .join(Receipt, Receipt.transaction_id == Transaction.id)
+        .join(_Member, _Member.id == Transaction.member_id)
+        .filter(
+            _Member.store_id == store_id,
+            Receipt.deleted_at == None,
+            Transaction.timestamp >= start,
+            Transaction.timestamp < end,
+        )
+        .all()
+    )
+
+
+@router.get("/summary", response_class=HTMLResponse)
+def summary_page(
+    request: Request,
+    period: str = "monthly",
+    year: int = None,
+    month: int = None,
+    db: Session = Depends(get_db),
+):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+
+    now = datetime.now()
+    if not year:
+        year = now.year
+    if not month:
+        month = now.month
+
+    # กำหนดช่วงวันที่
+    if period == "daily":
+        start = datetime(year, month, 1)
+        if month == 12:
+            end = datetime(year + 1, 1, 1)
+        else:
+            end = datetime(year, month + 1, 1)
+    elif period == "yearly":
+        start = datetime(year - 4, 1, 1)
+        end = datetime(year + 1, 1, 1)
+    else:  # monthly (default)
+        period = "monthly"
+        start = datetime(year, 1, 1)
+        end = datetime(year + 1, 1, 1)
+
+    rows = _summary_query(db, store.id, start, end)
+
+    # จัดกลุ่มด้วย Python
+    grouped: dict = defaultdict(lambda: {"count": 0, "total": 0.0})
+    for row in rows:
+        ts = row.timestamp
+        if not ts:
+            continue
+        if period == "daily":
+            key = ts.strftime("%Y-%m-%d")
+        elif period == "yearly":
+            key = ts.strftime("%Y")
+        else:
+            key = ts.strftime("%Y-%m")
+        grouped[key]["count"] += 1
+        grouped[key]["total"] += row.total or 0.0
+
+    sorted_data = sorted(grouped.items())
+    total_bills = sum(v["count"] for _, v in sorted_data)
+    total_amount = sum(v["total"] for _, v in sorted_data)
+
+    # labels/values สำหรับ Chart.js
+    chart_labels = [k for k, _ in sorted_data]
+    chart_counts = [v["count"] for _, v in sorted_data]
+    chart_totals = [round(v["total"], 2) for _, v in sorted_data]
+
+    # ปีทั้งหมดที่มีข้อมูล (สำหรับ dropdown ย้อนหลัง)
+    years_available = list(range(now.year, now.year - 5, -1))
+
+    return templates.TemplateResponse(request, "summary.html", {
+        "store_name": store.name,
+        "user_role": ctx["role"],
+        "period": period,
+        "year": year,
+        "month": month,
+        "sorted_data": sorted_data,
+        "total_bills": total_bills,
+        "total_amount": round(total_amount, 2),
+        "chart_labels": json.dumps(chart_labels, ensure_ascii=False),
+        "chart_counts": json.dumps(chart_counts),
+        "chart_totals": json.dumps(chart_totals),
+        "years_available": years_available,
+    })
+
+
+@router.get("/summary/detail", response_class=HTMLResponse)
+def summary_detail_page(
+    request: Request,
+    period: str = "monthly",
+    date_key: str = "",
+    db: Session = Depends(get_db),
+):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+
+    # แปลง date_key เป็น start/end datetime
+    try:
+        if period == "daily" and len(date_key) == 10:          # YYYY-MM-DD
+            start = datetime.strptime(date_key, "%Y-%m-%d")
+            end = datetime(start.year, start.month, start.day + 1) if start.day < 28 else \
+                  start.replace(day=1) + __import__("calendar").timedelta(days=32)
+            # simpler: use timedelta
+            from datetime import timedelta
+            end = start + timedelta(days=1)
+        elif period == "monthly" and len(date_key) == 7:       # YYYY-MM
+            y, m = int(date_key[:4]), int(date_key[5:7])
+            start = datetime(y, m, 1)
+            end = datetime(y + 1, 1, 1) if m == 12 else datetime(y, m + 1, 1)
+        elif period == "yearly" and len(date_key) == 4:        # YYYY
+            y = int(date_key)
+            start = datetime(y, 1, 1)
+            end = datetime(y + 1, 1, 1)
+        else:
+            return RedirectResponse("/web/summary", status_code=302)
+    except (ValueError, TypeError):
+        return RedirectResponse("/web/summary", status_code=302)
+
+    rows = (
+        db.query(Receipt, Transaction, Member)
+        .join(Transaction, Transaction.id == Receipt.transaction_id)
+        .join(Member, Member.id == Transaction.member_id)
+        .filter(
+            Member.store_id == store.id,
+            Receipt.deleted_at == None,
+            Transaction.timestamp >= start,
+            Transaction.timestamp < end,
+        )
+        .order_by(Transaction.timestamp.desc())
+        .all()
+    )
+
+    receipts_detail = []
+    for receipt, tx, member in rows:
+        payload = receipt.raw_payload or {}
+        receipts_detail.append({
+            "receipt": receipt,
+            "transaction": tx,
+            "member": member,
+            "total": tx.total,
+            "payment_method": tx.payment_method or "–",
+            "items_count": len(payload.get("items", [])),
+            "created_by_name": receipt.created_by_name or "–",
+        })
+
+    total_amount = sum(r["total"] for r in receipts_detail)
+
+    return templates.TemplateResponse(request, "summary_detail.html", {
+        "store_name": store.name,
+        "user_role": ctx["role"],
+        "period": period,
+        "date_key": date_key,
+        "receipts_detail": receipts_detail,
+        "total_amount": round(total_amount, 2),
+        "total_bills": len(receipts_detail),
+        "back_url": f"/web/summary?period={period}&year={date_key[:4]}",
+    })
+
+
+@router.get("/summary/export")
+def summary_export(
+    request: Request,
+    period: str = "monthly",
+    year: int = None,
+    month: int = None,
+    db: Session = Depends(get_db),
+):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+    now = datetime.now()
+    if not year:
+        year = now.year
+    if not month:
+        month = now.month
+
+    if period == "daily":
+        start = datetime(year, month, 1)
+        end = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
+        period_label = f"รายวัน เดือน {month:02d}/{year}"
+    elif period == "yearly":
+        start = datetime(year - 4, 1, 1)
+        end = datetime(year + 1, 1, 1)
+        period_label = f"รายปี (5 ปีล่าสุด ถึงปี {year})"
+    else:
+        period = "monthly"
+        start = datetime(year, 1, 1)
+        end = datetime(year + 1, 1, 1)
+        period_label = f"รายเดือน ปี {year}"
+
+    rows = _summary_query(db, store.id, start, end)
+
+    grouped: dict = defaultdict(lambda: {"count": 0, "total": 0.0})
+    for row in rows:
+        ts = row.timestamp
+        if not ts:
+            continue
+        if period == "daily":
+            key = ts.strftime("%Y-%m-%d")
+        elif period == "yearly":
+            key = ts.strftime("%Y")
+        else:
+            key = ts.strftime("%Y-%m")
+        grouped[key]["count"] += 1
+        grouped[key]["total"] += row.total or 0.0
+    sorted_data = sorted(grouped.items())
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "สรุปยอดขาย"
+
+    # Title
+    ws.merge_cells("A1:C1")
+    title_cell = ws["A1"]
+    title_cell.value = f"สรุปยอดขาย — {store.name}"
+    title_cell.font = Font(bold=True, size=14)
+    title_cell.alignment = Alignment(horizontal="center")
+
+    ws.merge_cells("A2:C2")
+    sub_cell = ws["A2"]
+    sub_cell.value = period_label
+    sub_cell.alignment = Alignment(horizontal="center")
+
+    ws.append([])
+
+    # Header row
+    header_fill = PatternFill("solid", fgColor="2563EB")
+    thin = Side(style="thin", color="CCCCCC")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    headers = ["ช่วงเวลา", "จำนวนใบเสร็จ", "ยอดรวม (บาท)"]
+    ws.append(headers)
+    for col_idx, h in enumerate(headers, 1):
+        cell = ws.cell(row=4, column=col_idx)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+        cell.border = border
+
+    for key, v in sorted_data:
+        ws.append([key, v["count"], round(v["total"], 2)])
+        for col_idx in range(1, 4):
+            ws.cell(row=ws.max_row, column=col_idx).border = border
+
+    # Total row
+    total_bills = sum(v["count"] for _, v in sorted_data)
+    total_amount = round(sum(v["total"] for _, v in sorted_data), 2)
+    ws.append(["รวมทั้งหมด", total_bills, total_amount])
+    for col_idx in range(1, 4):
+        cell = ws.cell(row=ws.max_row, column=col_idx)
+        cell.font = Font(bold=True)
+        cell.border = border
+
+    # Column widths
+    ws.column_dimensions["A"].width = 18
+    ws.column_dimensions["B"].width = 18
+    ws.column_dimensions["C"].width = 20
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f"summary_{period}_{year}.xlsx"
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )

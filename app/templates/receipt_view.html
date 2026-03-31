@@ -35,26 +35,105 @@
   </a>
   {% endif %}
   <span class="fw-bold text-dark">ใบกำกับภาษี #{{ doc_no }}</span>
+  {% if is_deleted %}
+  <span class="badge bg-danger ms-1"><i class="bi bi-trash-fill me-1"></i>ถูกลบแล้ว</span>
+  {% endif %}
   <div class="ms-auto d-flex gap-2">
-    {% if member %}
+    {% if member and not is_deleted %}
     <a href="/web/members/{{ member.id }}/new-bill" class="btn btn-primary btn-sm">
       <i class="bi bi-plus-circle me-1"></i>ออกบิลใหม่
     </a>
     {% endif %}
+    {% if not is_deleted %}
     <a href="/web/receipts/{{ receipt.id }}/edit" class="btn btn-outline-warning btn-sm">
       <i class="bi bi-pencil-square me-1"></i>แก้ไข
     </a>
+    {% if user_role in ['owner', 'admin'] %}
     <button type="button" class="btn btn-outline-danger btn-sm"
             data-bs-toggle="modal" data-bs-target="#deleteReceiptModal">
       <i class="bi bi-trash me-1"></i>ลบ
     </button>
+    {% endif %}
+    {% endif %}
     <button onclick="window.print()" class="btn btn-success btn-sm">
       <i class="bi bi-printer-fill me-1"></i>พิมพ์ A4 (2 สำเนา)
     </button>
   </div>
 </div>
 
+{# ─── Audit trail banner (เฉพาะหน้าจอ) ─── #}
+<div class="d-print-none mb-3">
+  <div class="card border-0 bg-light">
+    <div class="card-body py-2 px-3 small text-muted">
+      <div class="d-flex flex-wrap gap-3 align-items-center">
+        <span>
+          <i class="bi bi-person-check-fill text-primary me-1"></i>
+          <strong>ออกบิลโดย:</strong>
+          {{ receipt.created_by_name or '–' }}
+          {% if receipt.printed_at %}
+          &nbsp;·&nbsp; {{ receipt.printed_at.strftime('%d/%m/') }}{{ receipt.printed_at.year + 543 }}
+          {{ receipt.printed_at.strftime('%H:%M') }}
+          {% endif %}
+        </span>
+        {% if receipt.edit_log %}
+        <span class="text-warning">
+          <i class="bi bi-pencil-fill me-1"></i>
+          แก้ไขแล้ว <strong>{{ receipt.edit_log|length }}</strong> ครั้ง
+        </span>
+        {% endif %}
+        {% if is_deleted %}
+        <span class="text-danger fw-semibold">
+          <i class="bi bi-trash-fill me-1"></i>
+          ลบโดย: {{ receipt.deleted_by_name or '–' }}
+          {% if receipt.deleted_at %}
+          &nbsp;·&nbsp; {{ receipt.deleted_at.strftime('%d/%m/') }}{{ receipt.deleted_at.year + 543 }}
+          {{ receipt.deleted_at.strftime('%H:%M') }}
+          {% endif %}
+        </span>
+        {% endif %}
+      </div>
+      {# ─── ประวัติการแก้ไข ─── #}
+      {% if receipt.edit_log %}
+      <div class="mt-2">
+        <details>
+          <summary class="text-secondary" style="cursor:pointer">ดูประวัติการแก้ไขทั้งหมด</summary>
+          <table class="table table-sm mt-2 mb-0">
+            <thead class="table-light">
+              <tr><th>วันที่แก้ไข</th><th>แก้ไขโดย</th><th>รายการที่เปลี่ยน</th></tr>
+            </thead>
+            <tbody>
+              {% for entry in receipt.edit_log %}
+              <tr>
+                <td>{{ entry.at[:10] if entry.at else '–' }} {{ entry.at[11:16] if entry.at else '' }}</td>
+                <td>{{ entry.by_name or '–' }}</td>
+                <td>
+                  {% if entry.changes %}
+                    {% for field, val in entry.changes.items() %}
+                    <span class="badge bg-secondary me-1">
+                      {% if field == 'total' %}ยอดรวม: {{ val.old }} → {{ val.new }}
+                      {% elif field == 'payment_method' %}การชำระ: {{ val.old }} → {{ val.new }}
+                      {% elif field == 'items' %}รายการ: {{ val.old_count }} → {{ val.new_count }} รายการ
+                      {% else %}{{ field }}
+                      {% endif %}
+                    </span>
+                    {% endfor %}
+                  {% else %}
+                  <span class="text-muted">–</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </details>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
 {# ―― Delete Receipt Modal ―― #}
+{% if not is_deleted and user_role in ['owner', 'admin'] %}
 <div class="modal fade" id="deleteReceiptModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -77,6 +156,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 
 {# ═══════════════════════════════════════════════════
    MACRO: render one copy of the invoice

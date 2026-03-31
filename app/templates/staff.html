@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}จัดการผู้ใช้งาน – SilpPrint{% endblock %}
+{% block content %}
+
+{% if request.query_params.get('added') %}
+<div class="alert alert-success alert-dismissible fade show py-2">
+  <i class="bi bi-person-check-fill me-1"></i>เพิ่มผู้ใช้งานเรียบร้อยแล้ว
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if request.query_params.get('updated') %}
+<div class="alert alert-success alert-dismissible fade show py-2">
+  <i class="bi bi-check-circle-fill me-1"></i>บันทึกข้อมูลเรียบร้อยแล้ว
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if request.query_params.get('deleted') %}
+<div class="alert alert-warning alert-dismissible fade show py-2">
+  <i class="bi bi-person-dash-fill me-1"></i>ระงับการใช้งานเรียบร้อยแล้ว
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if request.query_params.get('full') %}
+<div class="alert alert-warning alert-dismissible fade show py-2">
+  <i class="bi bi-exclamation-circle-fill me-1"></i>ผู้ใช้งานครบ {{ staff_limit }} คนแล้ว ไม่สามารถสร้างเพิ่มได้
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <h5 class="mb-0 fw-bold">
+    <i class="bi bi-people-fill text-primary me-2"></i>จัดการผู้ใช้งาน
+    <span class="badge bg-secondary ms-1">{{ staff_count }} / {{ staff_limit }}</span>
+  </h5>
+  <div class="d-flex gap-2">
+    {% if staff_count < staff_limit %}
+    <form method="post" action="/web/staff/generate"
+          onsubmit="return confirm('สร้างผู้ใช้งานอัตโนมัติ {{ staff_limit - staff_count }} คน?')">
+      <button type="submit" class="btn btn-outline-secondary">
+        <i class="bi bi-magic me-1"></i>สร้างอัตโนมัติ ({{ staff_limit - staff_count }} คน)
+      </button>
+    </form>
+    <a href="/web/staff/new" class="btn btn-primary">
+      <i class="bi bi-person-plus-fill me-1"></i>เพิ่มผู้ใช้งาน
+    </a>
+    {% else %}
+    <button class="btn btn-secondary" disabled title="ถึงจำนวนสูงสุดแล้ว">
+      <i class="bi bi-person-plus-fill me-1"></i>เพิ่มผู้ใช้งาน (เต็มแล้ว)
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+<!-- คำอธิบายสิทธิ์ -->
+<div class="alert alert-info py-2 small mb-4">
+  <i class="bi bi-info-circle-fill me-1"></i>
+  <strong>Admin</strong> — จัดการสมาชิก/ใบเสร็จ/สินค้า/ตั้งค่าร้าน/จัดการ user ได้ทั้งหมด &nbsp;|&nbsp;
+  <strong>User</strong> — ดู/แก้ไขสมาชิก, ออกใบเสร็จ, ปรับราคาสินค้า (ไม่ลบ, ไม่จัดการตั้งค่า)
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th style="width:50px;">#</th>
+            <th>ชื่อ-นามสกุล</th>
+            <th>username</th>
+            <th class="text-center">สิทธิ์</th>
+            <th class="text-center">สถานะ</th>
+            <th class="text-center" style="width:120px;">จัดการ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in staff_list %}
+          <tr class="{% if not s.is_active %}table-secondary opacity-75{% endif %}">
+            <td class="text-muted small">{{ s.id }}</td>
+            <td class="fw-semibold">{{ s.name }}</td>
+            <td><code class="small">{{ s.username }}</code></td>
+            <td class="text-center">
+              {% if s.role == 'admin' %}
+              <span class="badge bg-primary">Admin</span>
+              {% else %}
+              <span class="badge bg-secondary">User</span>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if s.is_active %}
+              <span class="badge bg-success">ใช้งาน</span>
+              {% else %}
+              <span class="badge bg-danger">ระงับ</span>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              <a href="/web/staff/{{ s.id }}/edit" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-pencil-square"></i>
+              </a>
+              <form method="post" action="/web/staff/{{ s.id }}/delete" class="d-inline"
+                    onsubmit="return confirm('ระงับการใช้งาน {{ s.name }}?')">
+                <button class="btn btn-outline-danger btn-sm"
+                        {% if not s.is_active %}disabled{% endif %}>
+                  <i class="bi bi-person-slash"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-5">
+              <i class="bi bi-people display-6 d-block mb-2"></i>
+              ยังไม่มีผู้ใช้งาน กด <strong>เพิ่มผู้ใช้งาน</strong> เพื่อเริ่มต้น
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<p class="text-muted small mt-3">
+  <i class="bi bi-info-circle me-1"></i>
+  สามารถเพิ่มผู้ใช้งานได้สูงสุด <strong>{{ staff_limit }}</strong> คนต่อร้าน (ไม่รวมบัญชีเจ้าของ)
+</p>
+
+{# ─── Modal แสดง credentials ที่สร้างอัตโนมัติ ─── #}
+{% if generated_creds %}
+<div class="modal fade" id="generatedCredsModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-check-circle-fill me-2"></i>สร้างผู้ใช้งานอัตโนมัติสำเร็จ
+        </h5>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning py-2 small mb-3">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i>
+          <strong>กรุณาบันทึกรหัสผ่านไว้ก่อนปิด</strong> — ระบบจะไม่แสดงอีก
+        </div>
+        <table class="table table-sm table-bordered mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>ชื่อ</th>
+              <th>username</th>
+              <th>password (เริ่มต้น)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in generated_creds %}
+            <tr>
+              <td>{{ c.name }}</td>
+              <td><code>{{ c.username }}</code></td>
+              <td><code>{{ c.password }}</code></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p class="text-muted small mt-2 mb-0">เปลี่ยนรหัสผ่านได้ที่ปุ่ม <i class="bi bi-pencil-square"></i> แก้ไขของแต่ละคน</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-success" data-bs-dismiss="modal">รับทราบแล้ว</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function(){
+    new bootstrap.Modal(document.getElementById('generatedCredsModal')).show();
+  });
+</script>
+{% endif %}
+
+{% endblock %}

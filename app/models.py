@@ -42,7 +42,7 @@ class StaffUser(Base):
     name = Column(String, nullable=False)
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
-    role = Column(String, default="staff")  # owner / staff
+    role = Column(String, default="user")  # admin / user
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     store = relationship("Store", back_populates="staff")
@@ -115,5 +115,12 @@ class Receipt(Base):
     printed_at = Column(DateTime(timezone=True), server_default=func.now())
     content_path = Column(String, nullable=True)
     raw_payload = Column(JSON, nullable=True)
+    # Audit trail
+    created_by_name = Column(String, nullable=True)   # ชื่อผู้ออกบิล
+    created_by_id = Column(Integer, nullable=True)    # store.id หรือ staff.id
+    edit_log = Column(JSON, nullable=True)            # [{at, by_name, by_id, changes}]
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by_name = Column(String, nullable=True)
+    deleted_by_id = Column(Integer, nullable=True)
 
     transaction = relationship("Transaction", back_populates="receipts")

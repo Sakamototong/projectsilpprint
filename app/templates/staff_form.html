@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}{% if action == 'edit' %}แก้ไขผู้ใช้งาน{% else %}เพิ่มผู้ใช้งาน{% endif %} – SilpPrint{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4">
+  <a href="/web/staff" class="btn btn-outline-secondary btn-sm me-3">
+    <i class="bi bi-arrow-left"></i> กลับ
+  </a>
+  <h5 class="mb-0 fw-bold">
+    <i class="bi bi-person-fill text-primary me-2"></i>
+    {% if action == 'edit' %}แก้ไขผู้ใช้งาน{% else %}เพิ่มผู้ใช้งานใหม่{% endif %}
+  </h5>
+</div>
+
+{% if action == 'new' and staff_count >= staff_limit %}
+<div class="alert alert-danger">
+  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+  ถึงจำนวนผู้ใช้งานสูงสุดแล้ว ({{ staff_limit }} คน) ไม่สามารถเพิ่มได้อีก
+</div>
+{% else %}
+
+{% if error %}
+<div class="alert alert-danger py-2">
+  <i class="bi bi-exclamation-circle me-1"></i>{{ error }}
+</div>
+{% endif %}
+
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="card p-4">
+      <form method="post"
+            action="{% if action == 'edit' %}/web/staff/{{ staff.id }}/edit{% else %}/web/staff/new{% endif %}">
+
+        <div class="mb-3">
+          <label class="form-label fw-bold">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control"
+                 value="{{ form.name if form else '' }}" required placeholder="ชื่อ-นามสกุล">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-bold">username <span class="text-danger">*</span></label>
+          <input type="text" name="username" class="form-control"
+                 value="{{ form.username if form else '' }}" required
+                 placeholder="ตัวอักษรและตัวเลข ไม่มีช่องว่าง"
+                 pattern="[a-zA-Z0-9_\-]+" title="ใช้ได้เฉพาะตัวอักษร ตัวเลข _ และ -">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-bold">
+            รหัสผ่าน
+            {% if action == 'edit' %}
+            <span class="text-muted small fw-normal">(เว้นว่างไว้ถ้าไม่ต้องการเปลี่ยน)</span>
+            {% else %}
+            <span class="text-danger">*</span>
+            {% endif %}
+          </label>
+          <input type="password" name="password" class="form-control"
+                 placeholder="อย่างน้อย 6 ตัวอักษร"
+                 minlength="6"
+                 {% if action == 'new' %}required{% endif %}>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-bold">สิทธิ์การใช้งาน <span class="text-danger">*</span></label>
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <div class="card h-100 border-2 {% if (form.role if form else 'user') == 'admin' %}border-primary bg-primary bg-opacity-10{% else %}border-light{% endif %}"
+                   id="card-admin" style="cursor:pointer;" onclick="selectRole('admin')">
+                <div class="card-body p-3">
+                  <div class="form-check mb-0">
+                    <input class="form-check-input" type="radio" name="role" id="role_admin" value="admin"
+                           {% if (form.role if form else 'user') == 'admin' %}checked{% endif %}
+                           onchange="selectRole('admin')">
+                    <label class="form-check-label fw-bold" for="role_admin">
+                      <span class="badge bg-primary me-1">Admin</span>
+                    </label>
+                  </div>
+                  <ul class="small text-muted mt-2 mb-0 ps-3">
+                    <li>จัดการสมาชิก (เพิ่ม/แก้ไข/ลบ)</li>
+                    <li>ออกและลบใบเสร็จ</li>
+                    <li>จัดการสินค้าทั้งหมด</li>
+                    <li>ดูและแก้ไขตั้งค่าร้าน</li>
+                    <li>จัดการผู้ใช้งาน</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <div class="card h-100 border-2 {% if (form.role if form else 'user') == 'user' %}border-secondary bg-secondary bg-opacity-10{% else %}border-light{% endif %}"
+                   id="card-user" style="cursor:pointer;" onclick="selectRole('user')">
+                <div class="card-body p-3">
+                  <div class="form-check mb-0">
+                    <input class="form-check-input" type="radio" name="role" id="role_user" value="user"
+                           {% if (form.role if form else 'user') == 'user' %}checked{% endif %}
+                           onchange="selectRole('user')">
+                    <label class="form-check-label fw-bold" for="role_user">
+                      <span class="badge bg-secondary me-1">User</span>
+                    </label>
+                  </div>
+                  <ul class="small text-muted mt-2 mb-0 ps-3">
+                    <li>ดู/เพิ่ม/แก้ไขสมาชิก</li>
+                    <li>ออกใบเสร็จ (ลบไม่ได้)</li>
+                    <li>ปรับราคาสินค้า</li>
+                    <li class="text-danger">ลบสมาชิก/ใบเสร็จ ไม่ได้</li>
+                    <li class="text-danger">ตั้งค่าร้าน/User ไม่ได้</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {% if action == 'edit' %}
+        <div class="mb-4">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="is_active" value="1"
+                   id="isActive" {% if form.is_active %}checked{% endif %}>
+            <label class="form-check-label fw-bold" for="isActive">เปิดใช้งานบัญชีนี้</label>
+          </div>
+          <div class="form-text">ปิดสวิตช์เพื่อระงับการเข้าสู่ระบบของผู้ใช้งานนี้</div>
+        </div>
+        {% endif %}
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-grow-1">
+            <i class="bi bi-save me-1"></i>
+            {% if action == 'edit' %}บันทึกการเปลี่ยนแปลง{% else %}เพิ่มผู้ใช้งาน{% endif %}
+          </button>
+          <a href="/web/staff" class="btn btn-outline-secondary">ยกเลิก</a>
+        </div>
+      </form>
+    </div>
+
+    {% if action == 'new' %}
+    <p class="text-muted small mt-2 text-center">
+      <i class="bi bi-people me-1"></i>
+      ใช้งานแล้ว {{ staff_count }} / {{ staff_limit }} บัญชี
+    </p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<script>
+function selectRole(role) {
+  document.getElementById('role_' + role).checked = true;
+  ['admin', 'user'].forEach(r => {
+    const card = document.getElementById('card-' + r);
+    if (r === role) {
+      card.className = card.className.replace('border-light', '');
+      if (r === 'admin') {
+        card.classList.add('border-primary', 'bg-primary', 'bg-opacity-10');
+        card.classList.remove('border-secondary', 'bg-secondary');
+      } else {
+        card.classList.add('border-secondary', 'bg-secondary', 'bg-opacity-10');
+        card.classList.remove('border-primary', 'bg-primary');
+      }
+    } else {
+      card.classList.remove('border-primary', 'bg-primary', 'bg-opacity-10',
+                            'border-secondary', 'bg-secondary');
+      card.classList.add('border-light');
+    }
+  });
+}
+</script>
+
+{% endblock %}

@@ -20,10 +20,12 @@
     <a href="/web/members/{{ member.id }}/edit" class="btn btn-outline-primary btn-sm">
       <i class="bi bi-pencil-square me-1"></i>แก้ไข
     </a>
+    {% if user_role in ['owner', 'admin'] %}
     <button type="button" class="btn btn-outline-danger btn-sm"
             data-bs-toggle="modal" data-bs-target="#deleteModal">
       <i class="bi bi-trash me-1"></i>ลบสมาชิก
     </button>
+    {% endif %}
     <a href="/web/members/{{ member.id }}/new-bill" class="btn btn-success btn-sm">
       <i class="bi bi-receipt-cutoff me-1"></i>ออกบิล / ใบเสร็จ
     </a>

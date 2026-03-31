@@ -14,21 +14,10 @@
   <button type="button" class="btn-close float-end" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
-{% if request.query_params.get('staff_added') %}
-<div class="alert alert-success py-2">
-  <i class="bi bi-person-check-fill me-2"></i>เพิ่มผู้ใช้งานเรียบร้อยแล้ว
-  <button type="button" class="btn-close float-end" data-bs-dismiss="alert"></button>
-</div>
-{% endif %}
-{% if staff_error %}
-<div class="alert alert-danger py-2">
-  <i class="bi bi-exclamation-circle me-2"></i>{{ staff_error }}
-</div>
-{% endif %}
 
 <div class="row g-4">
   <!-- ข้อมูลร้านค้า -->
-  <div class="col-lg-6">
+  <div class="col-lg-8">
     <div class="card p-4">
       <h6 class="fw-bold mb-3 text-muted text-uppercase small">
         <i class="bi bi-shop me-1"></i>ข้อมูลร้านค้า / ออกใบเสร็จ
@@ -83,71 +72,11 @@
           <i class="bi bi-save me-1"></i>บันทึกข้อมูลร้าน
         </button>
       </form>
-    </div>
-  </div>
 
-  <!-- จัดการผู้ใช้งาน -->
-  <div class="col-lg-6">
-    <div class="card p-4">
-      <h6 class="fw-bold mb-3 text-muted text-uppercase small">
-        <i class="bi bi-people-fill me-1"></i>ผู้ใช้งานในร้าน
-      </h6>
-
-      {% if staff_list %}
-      <div class="table-responsive mb-3">
-        <table class="table table-sm align-middle">
-          <thead>
-            <tr>
-              <th>ชื่อ</th>
-              <th>username</th>
-              <th class="text-center">บทบาท</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for s in staff_list %}
-            <tr>
-              <td>{{ s.name }}</td>
-              <td class="font-monospace small">{{ s.username }}</td>
-              <td class="text-center">
-                <span class="badge bg-{{ 'warning text-dark' if s.role=='owner' else 'secondary' }}">{{ s.role }}</span>
-              </td>
-              <td class="text-end">
-                <form method="post" action="/web/settings/staff/{{ s.id }}/delete"
-                      onsubmit="return confirm('ลบผู้ใช้ {{ s.name }}?')" class="d-inline">
-                  <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
-                </form>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <p class="text-muted small mb-3">ยังไม่มีผู้ใช้งานเพิ่มเติม</p>
-      {% endif %}
-
-      <hr>
-      <h6 class="fw-bold mb-3 text-muted text-uppercase small">
-        <i class="bi bi-person-plus me-1"></i>เพิ่มผู้ใช้งาน
-      </h6>
-      <form method="post" action="/web/settings/staff/add">
-        <div class="mb-2">
-          <input type="text" name="name" class="form-control form-control-sm"
-                 placeholder="ชื่อ-นามสกุล" required>
-        </div>
-        <div class="mb-2">
-          <input type="text" name="username" class="form-control form-control-sm"
-                 placeholder="username" required>
-        </div>
-        <div class="mb-3">
-          <input type="password" name="password" class="form-control form-control-sm"
-                 placeholder="รหัสผ่าน" required minlength="6">
-        </div>
-        <button type="submit" class="btn btn-success w-100">
-          <i class="bi bi-person-plus me-1"></i>เพิ่มผู้ใช้งาน
-        </button>
-      </form>
+      <hr class="mt-4">
+      <a href="/web/staff" class="btn btn-outline-primary w-100">
+        <i class="bi bi-people-fill me-1"></i>จัดการผู้ใช้งาน (User Management)
+      </a>
     </div>
   </div>
 </div>

@@ -2,10 +2,15 @@
 {% block title %}รายการสินค้า – SilpPrint{% endblock %}
 {% block content %}
 
-<div class="d-flex align-items-center mb-4">
+<div class="d-flex align-items-center mb-4 flex-wrap gap-2">
   <h5 class="mb-0 fw-bold">
     <i class="bi bi-box-seam me-2 text-primary"></i>รายการสินค้า / บริการ
   </h5>
+  <div class="ms-auto d-flex gap-2">
+    <button id="batchSaveBtn" class="btn btn-success btn-sm d-none" onclick="saveBatchPrices()">
+      <i class="bi bi-save me-1"></i>บันทึกราคาทั้งหมด
+    </button>
+  </div>
 </div>
 
 {% if request.query_params.get('saved') %}
@@ -40,7 +45,16 @@
             <tr>
               <td class="fw-bold">{{ p.name }}</td>
               <td class="text-center text-muted">{{ p.unit }}</td>
-              <td class="text-end fw-bold text-primary">{{ "%.2f"|format(p.price) }}</td>
+              <td class="text-end" style="width:140px">
+                <input type="number"
+                       class="form-control form-control-sm text-end price-input fw-bold"
+                       data-id="{{ p.id }}"
+                       data-orig="{{ p.price }}"
+                       value="{{ "%.2f"|format(p.price) }}"
+                       step="0.01" min="0"
+                       style="max-width:110px; margin-left:auto;"
+                       oninput="onPriceChange(this)">
+              </td>
               <td class="text-center">
                 {% if p.is_active %}
                 <span class="badge bg-success">ใช้งาน</span>
@@ -49,6 +63,7 @@
                 {% endif %}
               </td>
               <td class="text-center">
+                {% if user_role in ['owner', 'admin'] %}
                 <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal"
                         data-bs-target="#editModal{{ p.id }}">
                   <i class="bi bi-pencil"></i>
@@ -57,6 +72,7 @@
                       onsubmit="return confirm('ลบสินค้านี้?')">
                   <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i></button>
                 </form>
+                {% endif %}
               </td>
             </tr>
 
@@ -124,6 +140,7 @@
 
   <!-- ฟอร์มเพิ่มสินค้า -->
   <div class="col-lg-4">
+    {% if user_role in ['owner', 'admin'] %}
     <div class="card p-4">
       <h6 class="fw-bold mb-3 text-muted text-uppercase small">
         <i class="bi bi-plus-circle me-1"></i>เพิ่มสินค้าใหม่
@@ -178,6 +195,12 @@
         </button>
       </form>
     </div>
+    {% else %}
+    <div class="card p-4 text-center text-muted">
+      <i class="bi bi-lock-fill fs-2 mb-2"></i>
+      <p class="small">คุณมีสิทธิ์แก้ไขราคาสินค้าเท่านั้น<br>ไม่สามารถเพิ่มหรือลบสินค้าได้</p>
+    </div>
+    {% endif %}
   </div>
 </div>
 
@@ -192,5 +215,40 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
     f.submit();
   });
 });
+
+// ─── Inline batch price ───
+function onPriceChange(input) {
+  const orig = parseFloat(input.dataset.orig);
+  const cur  = parseFloat(input.value);
+  if (!isNaN(cur) && Math.abs(cur - orig) > 0.001) {
+    input.classList.add('border-warning', 'text-warning');
+  } else {
+    input.classList.remove('border-warning', 'text-warning');
+  }
+  // แสดง/ซ่อนปุ่ม save
+  const dirty = document.querySelectorAll('.price-input.border-warning').length > 0;
+  document.getElementById('batchSaveBtn').classList.toggle('d-none', !dirty);
+}
+
+function saveBatchPrices() {
+  const prices = {};
+  document.querySelectorAll('.price-input').forEach(input => {
+    const orig = parseFloat(input.dataset.orig);
+    const cur  = parseFloat(input.value);
+    if (!isNaN(cur) && Math.abs(cur - orig) > 0.001) {
+      prices[input.dataset.id] = cur;
+    }
+  });
+  if (Object.keys(prices).length === 0) return;
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/web/products/batch-price';
+  const inp = document.createElement('input');
+  inp.type = 'hidden'; inp.name = 'prices_json';
+  inp.value = JSON.stringify(prices);
+  form.appendChild(inp);
+  document.body.appendChild(form);
+  form.submit();
+}
 </script>
 {% endblock %}

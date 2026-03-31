@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}รายละเอียดใบเสร็จ {{ date_key }} — {{ store_name }}{% endblock %}
+
+{% block content %}
+{% set pm_map = {'cash':'เงินสด','transfer':'โอนเงิน','qr':'QR / PromptPay','card':'บัตรเครดิต/เดบิต'} %}
+
+<div class="d-flex align-items-center mb-3 gap-2">
+  <a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i> กลับหน้าสรุป
+  </a>
+  <h5 class="mb-0 fw-bold ms-1">
+    <i class="bi bi-list-ul text-primary me-2"></i>รายละเอียดใบเสร็จ
+  </h5>
+  <span class="badge bg-primary ms-1 font-monospace">{{ date_key }}</span>
+</div>
+
+{# ─── Summary cards ─── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body text-center py-3">
+        <div class="text-muted small mb-1">จำนวนใบเสร็จ</div>
+        <div class="fs-3 fw-bold text-primary">{{ total_bills }}</div>
+        <div class="text-muted small">ใบ</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body text-center py-3">
+        <div class="text-muted small mb-1">ยอดรวม</div>
+        <div class="fs-3 fw-bold text-success">{{ "{:,.2f}".format(total_amount) }}</div>
+        <div class="text-muted small">บาท</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body text-center py-3">
+        <div class="text-muted small mb-1">เฉลี่ย/ใบ</div>
+        <div class="fs-3 fw-bold text-info">
+          {{ "{:,.2f}".format(total_amount / total_bills) if total_bills > 0 else "–" }}
+        </div>
+        <div class="text-muted small">บาท</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if receipts_detail %}
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white border-bottom-0 d-flex align-items-center justify-content-between">
+    <span class="fw-semibold"><i class="bi bi-receipt text-primary me-2"></i>รายการใบเสร็จ</span>
+    <span class="text-muted small">{{ total_bills }} รายการ</span>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">เลขที่ใบเสร็จ</th>
+          <th>สมาชิก</th>
+          <th>วันที่/เวลา</th>
+          <th>ช่องทางชำระ</th>
+          <th class="text-end">จำนวนรายการ</th>
+          <th class="text-end">ยอดรวม (บาท)</th>
+          <th>ออกโดย</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in receipts_detail %}
+        {% set receipt = r.receipt %}
+        {% set tx = r.transaction %}
+        {% set member = r.member %}
+        <tr>
+          <td class="ps-3 font-monospace text-muted small">#{{ '%09d'|format(receipt.id) }}</td>
+          <td>
+            <a href="/web/members/{{ member.id }}" class="text-decoration-none fw-semibold">
+              {{ member.name }}
+            </a>
+            {% if member.member_code %}
+            <div class="text-muted small">{{ member.member_code }}</div>
+            {% endif %}
+          </td>
+          <td class="small text-muted">
+            {% if tx.timestamp %}
+            {{ tx.timestamp.strftime('%d/%m/') }}{{ tx.timestamp.year + 543 }}
+            {{ tx.timestamp.strftime('%H:%M') }}
+            {% else %}–{% endif %}
+          </td>
+          <td>
+            <span class="badge
+              {% if r.payment_method == 'cash' %}bg-success
+              {% elif r.payment_method == 'transfer' %}bg-info text-dark
+              {% elif r.payment_method in ['qr', 'QR / PromptPay'] %}bg-warning text-dark
+              {% elif r.payment_method == 'card' %}bg-primary
+              {% else %}bg-secondary{% endif %}">
+              {{ pm_map.get(r.payment_method, r.payment_method) }}
+            </span>
+          </td>
+          <td class="text-end text-muted small">{{ r.items_count }} รายการ</td>
+          <td class="text-end fw-semibold">{{ "{:,.2f}".format(r.total) }}</td>
+          <td class="small text-muted">{{ r.created_by_name }}</td>
+          <td class="text-end pe-3">
+            <a href="/web/receipts/{{ receipt.id }}" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-eye me-1"></i>ดูใบเสร็จ
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td class="ps-3" colspan="5">รวมทั้งหมด</td>
+          <td class="text-end">{{ "{:,.2f}".format(total_amount) }}</td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+{% else %}
+<div class="alert alert-light border text-center py-5">
+  <i class="bi bi-inbox fs-1 text-muted d-block mb-2"></i>
+  <div class="text-muted">ไม่มีใบเสร็จในช่วงเวลานี้</div>
+</div>
+{% endif %}
+{% endblock %}

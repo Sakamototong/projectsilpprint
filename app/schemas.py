@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Optional, List
 
 
@@ -62,3 +62,41 @@ class StoreOut(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+class StaffCreate(BaseModel):
+    name: str
+    username: str
+    password: str
+    role: str = "user"  # "admin" | "user"
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: str) -> str:
+        if v not in ("admin", "user"):
+            raise ValueError("role must be 'admin' or 'user'")
+        return v
+
+
+class StaffUpdate(BaseModel):
+    name: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in ("admin", "user"):
+            raise ValueError("role must be 'admin' or 'user'")
+        return v
+
+
+class StaffOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    username: str
+    role: str
+    is_active: bool

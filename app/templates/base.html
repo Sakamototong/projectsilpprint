@@ -27,6 +27,13 @@
     {% if store_name %}
     <span class="navbar-text text-white me-3">
       <i class="bi bi-shop me-1"></i>{{ store_name }}
+      {% if user_role == 'owner' %}
+      <span class="badge bg-warning text-dark ms-1 small">Owner</span>
+      {% elif user_role == 'admin' %}
+      <span class="badge bg-info text-dark ms-1 small">Admin</span>
+      {% else %}
+      <span class="badge bg-secondary ms-1 small">User</span>
+      {% endif %}
     </span>
     <div class="ms-auto d-flex gap-2">
       <a class="btn btn-outline-light btn-sm" href="/web/enroll">
@@ -38,9 +45,17 @@
       <a class="btn btn-outline-light btn-sm" href="/web/products">
         <i class="bi bi-box-seam"></i> สินค้า
       </a>
+      <a class="btn btn-outline-light btn-sm" href="/web/summary">
+        <i class="bi bi-bar-chart-fill"></i> สรุป
+      </a>
+      {% if user_role in ['owner', 'admin'] %}
+      <a class="btn btn-outline-light btn-sm" href="/web/staff">
+        <i class="bi bi-people-fill"></i> User
+      </a>
       <a class="btn btn-outline-light btn-sm" href="/web/settings">
         <i class="bi bi-gear-fill"></i> ตั้งค่า
       </a>
+      {% endif %}
       <a class="btn btn-outline-danger btn-sm" href="/web/logout">
         <i class="bi bi-box-arrow-right"></i> ออก
       </a>

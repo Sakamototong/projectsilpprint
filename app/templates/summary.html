@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block title %}สรุปยอดขาย — {{ store_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <h5 class="mb-0 fw-bold"><i class="bi bi-bar-chart-fill text-primary me-2"></i>สรุปยอดขาย</h5>
+  <span class="text-muted small">{{ store_name }}</span>
+</div>
+
+{# ─── Filter bar ─── #}
+<form method="get" action="/web/summary" class="card border-0 bg-light mb-4">
+  <div class="card-body py-2 px-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label small mb-1 fw-semibold">ช่วงเวลา</label>
+        <div class="btn-group btn-group-sm" role="group">
+          <a href="/web/summary?period=daily&year={{ year }}&month={{ month }}"
+             class="btn {{ 'btn-primary' if period == 'daily' else 'btn-outline-primary' }}">รายวัน</a>
+          <a href="/web/summary?period=monthly&year={{ year }}&month={{ month }}"
+             class="btn {{ 'btn-primary' if period == 'monthly' else 'btn-outline-primary' }}">รายเดือน</a>
+          <a href="/web/summary?period=yearly&year={{ year }}&month={{ month }}"
+             class="btn {{ 'btn-primary' if period == 'yearly' else 'btn-outline-primary' }}">รายปี</a>
+        </div>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small mb-1 fw-semibold">ปี</label>
+        <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">
+          {% for y in years_available %}
+          <option value="{{ y }}" {{ 'selected' if y == year }}>{{ y + 543 }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if period == 'daily' %}
+      <div class="col-auto">
+        <label class="form-label small mb-1 fw-semibold">เดือน</label>
+        <select name="month" class="form-select form-select-sm" onchange="this.form.submit()">
+          {% for m in range(1, 13) %}
+          <option value="{{ m }}" {{ 'selected' if m == month }}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <input type="hidden" name="period" value="{{ period }}">
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-secondary">
+          <i class="bi bi-search me-1"></i>แสดง
+        </button>
+      </div>
+      <div class="col-auto ms-auto">
+        <a href="/web/summary/export?period={{ period }}&year={{ year }}&month={{ month }}"
+           class="btn btn-sm btn-success">
+          <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+        </a>
+      </div>
+    </div>
+  </div>
+</form>
+
+{# ─── Summary cards ─── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body text-center py-3">
+        <div class="text-muted small mb-1">จำนวนใบเสร็จ</div>
+        <div class="fs-3 fw-bold text-primary">{{ total_bills }}</div>
+        <div class="text-muted small">ใบ</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body text-center py-3">
+        <div class="text-muted small mb-1">ยอดรวม</div>
+        <div class="fs-3 fw-bold text-success">{{ "{:,.2f}".format(total_amount) }}</div>
+        <div class="text-muted small">บาท</div>
+      </div>
+    </div>
+  </div>
+  {% if sorted_data %}
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body text-center py-3">
+        <div class="text-muted small mb-1">เฉลี่ยต่อใบเสร็จ</div>
+        <div class="fs-3 fw-bold text-info">
+          {{ "{:,.2f}".format(total_amount / total_bills) if total_bills > 0 else "–" }}
+        </div>
+        <div class="text-muted small">บาท/ใบ</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body text-center py-3">
+        <div class="text-muted small mb-1">จำนวนช่วงเวลา</div>
+        <div class="fs-3 fw-bold text-secondary">{{ sorted_data|length }}</div>
+        <div class="text-muted small">{{ 'วัน' if period == 'daily' else ('เดือน' if period == 'monthly' else 'ปี') }}</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% if sorted_data %}
+{# ─── Chart ─── #}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white border-bottom-0 fw-semibold">
+    <i class="bi bi-graph-up text-primary me-2"></i>กราฟยอดขาย
+  </div>
+  <div class="card-body">
+    <canvas id="summaryChart" style="max-height:320px;"></canvas>
+  </div>
+</div>
+
+{# ─── Table ─── #}
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white border-bottom-0 fw-semibold">
+    <i class="bi bi-table text-primary me-2"></i>ตารางข้อมูล
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>ช่วงเวลา</th>
+          <th class="text-end">จำนวนใบเสร็จ</th>
+          <th class="text-end">ยอดรวม (บาท)</th>
+          <th class="text-end">เฉลี่ย/ใบ (บาท)</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for key, v in sorted_data %}
+        <tr>
+          <td class="font-monospace">{{ key }}</td>
+          <td class="text-end">{{ v.count }}</td>
+          <td class="text-end fw-semibold">{{ "{:,.2f}".format(v.total) }}</td>
+          <td class="text-end text-muted">
+            {{ "{:,.2f}".format(v.total / v.count) if v.count > 0 else "–" }}
+          </td>
+          <td class="text-end">
+            <a href="/web/summary/detail?period={{ period }}&date_key={{ key }}"
+               class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-list-ul me-1"></i>รายละเอียด
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light fw-bold">
+        <tr>
+          <td>รวมทั้งหมด</td>
+          <td class="text-end">{{ total_bills }}</td>
+          <td class="text-end">{{ "{:,.2f}".format(total_amount) }}</td>
+          <td class="text-end">{{ "{:,.2f}".format(total_amount / total_bills) if total_bills > 0 else "–" }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+{% else %}
+<div class="alert alert-light border text-center py-5">
+  <i class="bi bi-inbox fs-1 text-muted d-block mb-2"></i>
+  <div class="text-muted">ไม่มีข้อมูลในช่วงเวลานี้</div>
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  const labels  = {{ chart_labels | safe }};
+  const counts  = {{ chart_counts | safe }};
+  const totals  = {{ chart_totals | safe }};
+
+  if (!labels.length) return;
+
+  const ctx = document.getElementById('summaryChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'ยอดรวม (บาท)',
+          data: totals,
+          backgroundColor: 'rgba(37,99,235,0.7)',
+          borderColor: 'rgba(37,99,235,1)',
+          borderWidth: 1,
+          yAxisID: 'yAmount',
+          order: 2,
+        },
+        {
+          label: 'จำนวนใบเสร็จ',
+          data: counts,
+          type: 'line',
+          borderColor: 'rgba(234,88,12,1)',
+          backgroundColor: 'rgba(234,88,12,0.15)',
+          borderWidth: 2,
+          pointRadius: 4,
+          tension: 0.3,
+          fill: true,
+          yAxisID: 'yCount',
+          order: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              if (ctx.datasetIndex === 0)
+                return ' ยอดรวม: ฿' + ctx.parsed.y.toLocaleString('th-TH', {minimumFractionDigits:2});
+              return ' จำนวน: ' + ctx.parsed.y + ' ใบ';
+            }
+          }
+        }
+      },
+      scales: {
+        yAmount: {
+          type: 'linear',
+          position: 'left',
+          title: { display: true, text: 'ยอดรวม (บาท)' },
+          ticks: { callback: (v) => '฿' + v.toLocaleString('th-TH') },
+        },
+        yCount: {
+          type: 'linear',
+          position: 'right',
+          title: { display: true, text: 'จำนวนใบ' },
+          grid: { drawOnChartArea: false },
+          ticks: { stepSize: 1 },
+        },
+      },
+    },
+  });
+})();
+</script>
+{% endblock %}
