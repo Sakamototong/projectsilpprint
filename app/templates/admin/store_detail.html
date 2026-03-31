@@ -1,0 +1,181 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ store.name }}{% endblock %}
+{% block content %}
+<div class="mb-3">
+  <a href="/admin/stores" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>กลับ
+  </a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white fw-semibold border-0 pt-3">
+        <i class="bi bi-shop me-1 text-primary"></i>ข้อมูลร้านค้า
+      </div>
+      <div class="card-body">
+        <table class="table table-sm table-borderless mb-0">
+          <tr><th class="text-muted" style="width:130px">ชื่อร้าน</th><td class="fw-semibold">{{ store.name }}</td></tr>
+          <tr><th class="text-muted">Username</th><td>{{ store.username }}</td></tr>
+          <tr><th class="text-muted">ประเภทธุรกิจ</th><td>{{ store.business_type or '—' }}</td></tr>
+          <tr><th class="text-muted">เบอร์โทร</th><td>{{ store.phone or '—' }}</td></tr>
+          <tr><th class="text-muted">อีเมล</th><td>{{ store.email or '—' }}</td></tr>
+          <tr><th class="text-muted">ที่อยู่</th><td>{{ store.address or '—' }}</td></tr>
+          <tr><th class="text-muted">Tax ID</th><td>{{ store.tax_id or '—' }}</td></tr>
+          <tr><th class="text-muted">สมัครเมื่อ</th><td>{{ store.created_at.strftime('%d/%m/%Y %H:%M') if store.created_at }}</td></tr>
+          <tr><th class="text-muted">Subscription</th><td>
+            {% if store.subscription_status == 'active' %}<span class="badge bg-success">Active</span>
+            {% elif store.subscription_status == 'grace' %}<span class="badge bg-warning text-dark">Grace</span>
+            {% elif store.subscription_status == 'expired' %}<span class="badge bg-danger">Expired</span>
+            {% else %}<span class="badge bg-light text-dark border">Free</span>{% endif %}
+          </td></tr>
+          <tr><th class="text-muted">สถานะร้าน</th><td>
+            {% if store.store_status == 'active' %}<span class="badge bg-success">ใช้งาน</span>
+            {% elif store.store_status == 'rejected' %}<span class="badge bg-danger">ถูกปฏิเสธ</span>
+            {% else %}<span class="badge bg-warning text-dark">{{ store.store_status }}</span>{% endif %}
+          </td></tr>
+          {% if store.rejection_reason %}
+          <tr><th class="text-muted">เหตุผลปฏิเสธ</th><td class="text-danger">{{ store.rejection_reason }}</td></tr>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <!-- Approve / Assign Plan -->
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white fw-semibold border-0 pt-3">
+        <i class="bi bi-check-circle me-1 text-success"></i>อนุมัติ / กำหนดแผน
+      </div>
+      <div class="card-body">
+        <form method="post" action="/admin/stores/{{ store.id }}/approve">
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">แผนการสมัคร</label>
+            <select name="plan_id" class="form-select form-select-sm" required>
+              {% for p in plans %}
+              <option value="{{ p.id }}" {% if store.requested_plan_id == p.id %}selected{% endif %}>
+                {{ p.name }} (฿{{ "%.0f"|format(p.price_monthly) }}/เดือน)
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">รูปแบบการชำระ</label>
+            <select name="billing_cycle" class="form-select form-select-sm">
+              <option value="monthly">รายเดือน</option>
+              <option value="yearly">รายปี</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-success btn-sm w-100">
+            <i class="bi bi-check-lg me-1"></i>อนุมัติ + สร้างใบแจ้งชำระ
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Reject -->
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white fw-semibold border-0 pt-3">
+        <i class="bi bi-x-circle me-1 text-danger"></i>ปฏิเสธร้านค้า
+      </div>
+      <div class="card-body">
+        <form method="post" action="/admin/stores/{{ store.id }}/reject">
+          <div class="mb-2">
+            <textarea name="reason" class="form-control form-control-sm" rows="2"
+              placeholder="เหตุผล (แสดงให้ร้านค้าเห็น)">{{ store.rejection_reason or '' }}</textarea>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="hard_delete" id="chkDel" value="1">
+            <label class="form-check-label small text-danger" for="chkDel">ลบข้อมูลร้านค้าทั้งหมดออกจากระบบ</label>
+          </div>
+          <button type="submit" class="btn btn-danger btn-sm w-100"
+            onclick="return confirm('ยืนยันการปฏิเสธร้านค้านี้?')">
+            <i class="bi bi-x-lg me-1"></i>ปฏิเสธ
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Subscriptions & Invoices -->
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-header bg-white fw-semibold border-0 pt-3">
+    <i class="bi bi-calendar-check me-1 text-primary"></i>ประวัติ Subscription
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>แผน</th><th>รูปแบบ</th><th>สถานะ</th><th>เริ่ม</th><th>หมดอายุ</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for sub in subscriptions %}
+      <tr>
+        <td class="fw-semibold">{{ sub.plan.name if sub.plan else '—' }}</td>
+        <td>{{ 'รายเดือน' if sub.billing_cycle == 'monthly' else 'รายปี' }}</td>
+        <td>
+          {% if sub.status == 'active' %}<span class="badge bg-success">Active</span>
+          {% elif sub.status == 'grace' %}<span class="badge bg-warning text-dark">Grace</span>
+          {% elif sub.status == 'expired' %}<span class="badge bg-danger">Expired</span>
+          {% elif sub.status == 'cancelled' %}<span class="badge bg-secondary">ยกเลิก</span>
+          {% else %}<span class="badge bg-light text-dark border">{{ sub.status }}</span>{% endif %}
+        </td>
+        <td class="text-muted small">{{ sub.started_at.strftime('%d/%m/%Y') if sub.started_at }}</td>
+        <td class="text-muted small">{{ sub.expires_at.strftime('%d/%m/%Y') if sub.expires_at else '—' }}</td>
+        <td>
+          <form method="post" action="/admin/subscriptions/{{ sub.id }}/renew" class="d-inline">
+            <button class="btn btn-sm btn-outline-success">ต่ออายุ</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-center text-muted py-3">ยังไม่มี subscription</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-white fw-semibold border-0 pt-3">
+    <i class="bi bi-receipt me-1 text-warning"></i>ใบแจ้งชำระ
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>#</th><th>งวด</th><th>รูปแบบ</th><th>จำนวน</th><th>สถานะ</th><th>ครบกำหนด</th><th>ชำระเมื่อ</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for inv in invoices %}
+      <tr>
+        <td class="text-muted">{{ inv.id }}</td>
+        <td>{{ inv.period_label or '—' }}</td>
+        <td>{{ 'รายเดือน' if inv.billing_cycle == 'monthly' else 'รายปี' }}</td>
+        <td class="fw-semibold">฿{{ "%.0f"|format(inv.amount) }}</td>
+        <td>
+          {% if inv.status == 'paid' %}<span class="badge bg-success">ชำระแล้ว</span>
+          {% elif inv.status == 'overdue' %}<span class="badge bg-danger">เกินกำหนด</span>
+          {% else %}<span class="badge bg-warning text-dark">รอชำระ</span>{% endif %}
+        </td>
+        <td class="text-muted small">{{ inv.due_date.strftime('%d/%m/%Y') if inv.due_date else '—' }}</td>
+        <td class="text-muted small">{{ inv.paid_at.strftime('%d/%m/%Y') if inv.paid_at else '—' }}</td>
+        <td>
+          {% if inv.status != 'paid' %}
+          <form method="post" action="/admin/invoices/{{ inv.id }}/confirm-payment" class="d-inline">
+            <button class="btn btn-sm btn-success" onclick="return confirm('ยืนยันการชำระเงิน?')">ยืนยันชำระ</button>
+          </form>
+          <form method="post" action="/admin/invoices/{{ inv.id }}/mark-overdue" class="d-inline ms-1">
+            <button class="btn btn-sm btn-outline-danger">ค้างชำระ</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="text-center text-muted py-3">ยังไม่มีใบแจ้งชำระ</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

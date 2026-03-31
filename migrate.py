@@ -47,5 +47,21 @@ with engine.connect() as conn:
     else:
         print('receipts table already up to date')
 
+    # SaaS columns for stores
+    rows = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='stores'"))
+    store_cols = {r[0] for r in rows}
+    saas_alters = []
+    if 'business_type'       not in store_cols: saas_alters.append("ADD COLUMN business_type VARCHAR")
+    if 'requested_plan_id'   not in store_cols: saas_alters.append("ADD COLUMN requested_plan_id INTEGER")
+    if 'store_status'        not in store_cols: saas_alters.append("ADD COLUMN store_status VARCHAR DEFAULT 'active'")
+    if 'rejection_reason'    not in store_cols: saas_alters.append("ADD COLUMN rejection_reason TEXT")
+    if 'subscription_status' not in store_cols: saas_alters.append("ADD COLUMN subscription_status VARCHAR DEFAULT 'free'")
+    if saas_alters:
+        conn.execute(text('ALTER TABLE stores ' + ', '.join(saas_alters)))
+        conn.commit()
+        print('Added SaaS store columns:', saas_alters)
+    else:
+        print('stores SaaS columns already up to date')
+
 Base.metadata.create_all(bind=engine)
 print('create_all done (new tables created if needed)')

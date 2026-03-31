@@ -2,7 +2,7 @@
 {% block title %}ลงทะเบียนร้านค้า – SilpPrint{% endblock %}
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-sm-10 col-md-7 col-lg-5">
+  <div class="col-sm-10 col-md-8 col-lg-6">
     <div class="card p-4">
       <h5 class="card-title mb-4 fw-bold">
         <i class="bi bi-shop text-primary me-2"></i>ลงทะเบียนร้านค้าใหม่
@@ -13,6 +13,7 @@
       {% endif %}
 
       <form method="post" action="/web/register">
+        <p class="fw-semibold text-muted small mb-2">ข้อมูลพื้นฐาน</p>
         <div class="mb-3">
           <label class="form-label fw-semibold">ชื่อร้านค้า <span class="text-danger">*</span></label>
           <input type="text" name="store_name" class="form-control" required autofocus
@@ -24,7 +25,7 @@
                  placeholder="ตัวอักษรและตัวเลข ไม่มีช่องว่าง" pattern="[a-zA-Z0-9_]+">
           <div class="form-text">ใช้สำหรับเข้าสู่ระบบ เปลี่ยนภายหลังไม่ได้</div>
         </div>
-        <div class="row g-2 mb-4">
+        <div class="row g-2 mb-3">
           <div class="col">
             <label class="form-label fw-semibold">รหัสผ่าน <span class="text-danger">*</span></label>
             <input type="password" name="password" id="pw" class="form-control" required minlength="6" placeholder="อย่างน้อย 6 ตัว">
@@ -34,7 +35,60 @@
             <input type="password" name="password_confirm" id="pw2" class="form-control" required minlength="6" placeholder="พิมพ์ซ้ำ">
           </div>
         </div>
-        <button type="submit" class="btn btn-success btn-lg w-100">
+
+        <hr class="my-3">
+        <p class="fw-semibold text-muted small mb-2">ข้อมูลติดต่อ</p>
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">เบอร์โทรศัพท์</label>
+            <input type="tel" name="phone" class="form-control" placeholder="0xx-xxx-xxxx">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">อีเมล</label>
+            <input type="email" name="email" class="form-control" placeholder="example@mail.com">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">ที่อยู่ร้านค้า</label>
+          <textarea name="address" class="form-control" rows="2" placeholder="ที่อยู่สำหรับออกใบเสร็จ"></textarea>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">เลขประจำตัวผู้เสียภาษี (Tax ID)</label>
+            <input type="text" name="tax_id" class="form-control" placeholder="13 หลัก">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">ประเภทธุรกิจ</label>
+            <select name="business_type" class="form-select">
+              <option value="">-- เลือกประเภท --</option>
+              <option value="fuel_station">ปั๊มน้ำมัน</option>
+              <option value="retail">ร้านค้าปลีก</option>
+              <option value="other">อื่น ๆ</option>
+            </select>
+          </div>
+        </div>
+
+        {% if plans %}
+        <hr class="my-3">
+        <p class="fw-semibold text-muted small mb-2">แผนที่สนใจ (ไม่บังคับ — เริ่มต้นฟรีทุกร้าน)</p>
+        <div class="row g-2 mb-3">
+          {% for p in plans %}
+          <div class="col-md-6">
+            <div class="form-check border rounded p-3">
+              <input class="form-check-input" type="radio" name="requested_plan_id" id="plan{{ p.id }}"
+                     value="{{ p.id }}">
+              <label class="form-check-label fw-semibold" for="plan{{ p.id }}">
+                {{ p.name }}
+                <span class="text-muted fw-normal small d-block">฿{{ "%.0f"|format(p.price_monthly) }}/เดือน</span>
+                {% if p.description %}<span class="text-muted small d-block">{{ p.description }}</span>{% endif %}
+              </label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-success btn-lg w-100 mt-2">
           <i class="bi bi-check-circle me-1"></i>ลงทะเบียน
         </button>
       </form>

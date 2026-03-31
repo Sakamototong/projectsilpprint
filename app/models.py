@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, JSON, Boolean, func
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, JSON, Boolean, func, Text
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 from sqlalchemy import create_engine
 
@@ -29,6 +29,12 @@ class Store(Base):
     email = Column(String, nullable=True)
     vat_rate = Column(Float, default=7.0)       # % VAT (0 = ไม่มี VAT)
     include_vat = Column(Boolean, default=True) # แสดง VAT ในใบเสร็จ
+    # SaaS / approval fields
+    business_type = Column(String, nullable=True)          # "fuel_station"/"retail"/"other"
+    requested_plan_id = Column(Integer, ForeignKey("subscription_plans.id"), nullable=True)
+    store_status = Column(String, default="active")        # "active"/"rejected"/"suspended"
+    rejection_reason = Column(Text, nullable=True)
+    subscription_status = Column(String, default="free")   # "free"/"active"/"grace"/"expired"
     members = relationship("Member", back_populates="store")
     staff = relationship("StaffUser", back_populates="store")
     products = relationship("Product", back_populates="store")
@@ -124,3 +130,66 @@ class Receipt(Base):
     deleted_by_id = Column(Integer, nullable=True)
 
     transaction = relationship("Transaction", back_populates="receipts")
+
+
+# ─── SaaS / Billing Models ───────────────────────────────────────────────────
+
+class PlatformAdmin(Base):
+    """Superadmin users for the /admin/* dashboard (separate from store staff)."""
+    __tablename__ = "platform_admins"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class SubscriptionPlan(Base):
+    """Admin-defined plans that stores can subscribe to."""
+    __tablename__ = "subscription_plans"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    price_monthly = Column(Float, default=0.0)
+    price_yearly = Column(Float, default=0.0)
+    # Limits (0 = unlimited)
+    max_members = Column(Integer, default=0)
+    max_staff = Column(Integer, default=0)
+    max_receipts_per_month = Column(Integer, default=0)
+    max_products = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    subscriptions = relationship("StoreSubscription", back_populates="plan")
+
+
+class StoreSubscription(Base):
+    """Active/historical subscription record per store."""
+    __tablename__ = "store_subscriptions"
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
+    plan_id = Column(Integer, ForeignKey("subscription_plans.id"), nullable=False)
+    billing_cycle = Column(String, default="monthly")   # "monthly" / "yearly"
+    status = Column(String, default="active")           # "active"/"grace"/"expired"/"cancelled"
+    started_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    grace_until = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    plan = relationship("SubscriptionPlan", back_populates="subscriptions")
+    invoices = relationship("SubscriptionInvoice", back_populates="subscription")
+
+
+class SubscriptionInvoice(Base):
+    """Invoice issued per billing period per store subscription."""
+    __tablename__ = "subscription_invoices"
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
+    subscription_id = Column(Integer, ForeignKey("store_subscriptions.id"), nullable=False)
+    amount = Column(Float, nullable=False)
+    billing_cycle = Column(String, nullable=False)      # "monthly" / "yearly"
+    period_label = Column(String, nullable=True)        # e.g. "มี.ค. 2026"
+    status = Column(String, default="pending")          # "pending"/"paid"/"overdue"
+    due_date = Column(DateTime(timezone=True), nullable=True)
+    paid_at = Column(DateTime(timezone=True), nullable=True)
+    note = Column(Text, nullable=True)
+    payment_ref = Column(String, nullable=True)         # for future gateway reference
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    subscription = relationship("StoreSubscription", back_populates="invoices")

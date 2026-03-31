@@ -1,0 +1,66 @@
+{% extends "admin/base.html" %}
+{% block title %}ร้านค้า{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-4 gap-2 flex-wrap">
+  <h4 class="fw-bold mb-0 me-auto">ร้านค้าทั้งหมด</h4>
+  <form method="get" action="/admin/stores" class="d-flex gap-2 flex-wrap">
+    <select name="status" class="form-select form-select-sm" style="width:140px" onchange="this.form.submit()">
+      <option value="">ทุกสถานะ</option>
+      <option value="active" {% if status_filter=='active' %}selected{% endif %}>ใช้งาน</option>
+      <option value="rejected" {% if status_filter=='rejected' %}selected{% endif %}>ถูกปฏิเสธ</option>
+      <option value="suspended" {% if status_filter=='suspended' %}selected{% endif %}>ถูกระงับ</option>
+    </select>
+    <select name="sub_status" class="form-select form-select-sm" style="width:140px" onchange="this.form.submit()">
+      <option value="">ทุกแผน</option>
+      <option value="free" {% if sub_filter=='free' %}selected{% endif %}>Free</option>
+      <option value="active" {% if sub_filter=='active' %}selected{% endif %}>Active</option>
+      <option value="grace" {% if sub_filter=='grace' %}selected{% endif %}>Grace</option>
+      <option value="expired" {% if sub_filter=='expired' %}selected{% endif %}>Expired</option>
+    </select>
+    <input name="q" type="text" class="form-control form-control-sm" placeholder="ค้นหาชื่อร้าน..." value="{{ q|default('') }}" style="width:180px">
+    <button class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
+  </form>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>ชื่อร้าน</th>
+          <th>Username</th>
+          <th>ประเภท</th>
+          <th>แผนที่ขอ</th>
+          <th>สถานะร้าน</th>
+          <th>Subscription</th>
+          <th>สมัครเมื่อ</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for s in stores %}
+      <tr>
+        <td class="text-muted">{{ s.id }}</td>
+        <td class="fw-semibold">{{ s.name }}</td>
+        <td class="text-muted">{{ s.username }}</td>
+        <td>{% if s.business_type %}<span class="badge bg-light text-dark border">{{ s.business_type }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+        <td>{% if s.requested_plan_name %}<span class="badge bg-info text-dark">{{ s.requested_plan_name }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+        <td>
+          {% if s.store_status == 'active' %}<span class="badge bg-success">ใช้งาน</span>
+          {% elif s.store_status == 'rejected' %}<span class="badge bg-danger">ถูกปฏิเสธ</span>
+          {% elif s.store_status == 'suspended' %}<span class="badge bg-warning text-dark">ถูกระงับ</span>
+          {% else %}<span class="badge bg-secondary">{{ s.store_status }}</span>{% endif %}
+        </td>
+        <td><span class="badge bg-light text-dark border">{{ s.subscription_status }}</span></td>
+        <td class="text-muted small">{{ s.created_at.strftime('%d/%m/%Y') if s.created_at }}</td>
+        <td><a href="/admin/stores/{{ s.id }}" class="btn btn-sm btn-outline-primary">ดูรายละเอียด</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9" class="text-center text-muted py-4">ไม่พบร้านค้า</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

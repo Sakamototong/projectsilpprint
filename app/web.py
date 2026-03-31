@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from .models import SessionLocal, Store, Member, Transaction, Receipt, BillingProfile, Product, StaffUser
+from .models import SessionLocal, Store, Member, Transaction, Receipt, BillingProfile, Product, StaffUser, StoreSubscription, SubscriptionPlan
 from .core.security import hash_password, verify_password, create_access_token, decode_token
 from .services.member_service import MemberService
 
@@ -121,6 +121,62 @@ def _get_products(db: Session, store_id: int):
 
 
 # ──────────────────────────────────────────
+# Usage limits helpers
+# ──────────────────────────────────────────
+_FREE_TIER = {
+    "max_members": 50,
+    "max_staff": 2,
+    "max_receipts_per_month": 100,
+    "max_products": 10,
+}
+
+STAFF_LIMIT = 10  # absolute max regardless of plan
+
+
+def _get_plan_limits(store: Store, db: Session) -> dict:
+    """Return limit dict from active subscription plan, or free-tier defaults."""
+    if store.subscription_status not in ("active", "grace"):
+        return _FREE_TIER.copy()
+    sub = (
+        db.query(StoreSubscription)
+        .filter(
+            StoreSubscription.store_id == store.id,
+            StoreSubscription.status.in_(["active", "grace"]),
+        )
+        .order_by(StoreSubscription.id.desc())
+        .first()
+    )
+    if not sub or not sub.plan_id:
+        return _FREE_TIER.copy()
+    plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == sub.plan_id).first()
+    if not plan:
+        return _FREE_TIER.copy()
+    return {
+        "max_members": plan.max_members,
+        "max_staff": plan.max_staff,
+        "max_receipts_per_month": plan.max_receipts_per_month,
+        "max_products": plan.max_products,
+    }
+
+
+def _check_limit(limits: dict, resource: str, current_count: int) -> tuple[bool, str]:
+    """Return (allowed, error_message). 0 in limits means unlimited."""
+    limit = limits.get(resource, 0)
+    if limit == 0:
+        return True, ""
+    if current_count >= limit:
+        label_map = {
+            "max_members": "สมาชิก",
+            "max_staff": "ผู้ใช้งาน",
+            "max_receipts_per_month": "ใบเสร็จต่อเดือน",
+            "max_products": "สินค้า",
+        }
+        label = label_map.get(resource, resource)
+        return False, f"ถึงขีดจำกัด {label} ({current_count}/{limit}) ตามแผนปัจจุบัน กรุณาอัพเกรดแผน"
+    return True, ""
+
+
+# ──────────────────────────────────────────
 # Login / Logout
 # ──────────────────────────────────────────
 @router.get("/login", response_class=HTMLResponse)
@@ -137,6 +193,13 @@ def login_post(
 ):
     store = db.query(Store).filter(Store.username == username).first()
     if store and verify_password(password, store.hashed_password):
+        # Block rejected stores
+        if getattr(store, "store_status", "active") == "rejected":
+            reason = getattr(store, "rejection_reason", "") or "ไม่ระบุเหตุผล"
+            return templates.TemplateResponse(
+                request, "login.html",
+                {"error": f"บัญชีนี้ถูกปฏิเสธ: {reason}"},
+            )
         token = create_access_token({
             "sub": str(store.id),
             "store_name": store.name,
@@ -153,6 +216,14 @@ def login_post(
                 request,
                 "login.html",
                 {"error": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"},
+            )
+        # Check if parent store is rejected
+        parent_store = db.query(Store).filter(Store.id == staff.store_id).first()
+        if parent_store and getattr(parent_store, "store_status", "active") == "rejected":
+            reason = getattr(parent_store, "rejection_reason", "") or "ไม่ระบุเหตุผล"
+            return templates.TemplateResponse(
+                request, "login.html",
+                {"error": f"บัญชีร้านค้านี้ถูกปฏิเสธ: {reason}"},
             )
         token = create_access_token({
             "sub": str(staff.store_id),
@@ -178,8 +249,9 @@ def logout():
 # ลงทะเบียนร้านค้าใหม่
 # ──────────────────────────────────────────
 @router.get("/register", response_class=HTMLResponse)
-def register_page(request: Request):
-    return templates.TemplateResponse(request, "register.html")
+def register_page(request: Request, db: Session = Depends(get_db)):
+    plans = db.query(SubscriptionPlan).filter(SubscriptionPlan.is_active == True).order_by(SubscriptionPlan.id).all()
+    return templates.TemplateResponse(request, "register.html", {"plans": plans})
 
 
 @router.post("/register")
@@ -189,24 +261,47 @@ def register_post(
     username: str = Form(...),
     password: str = Form(...),
     password_confirm: str = Form(...),
+    phone: str = Form(""),
+    email: str = Form(""),
+    address: str = Form(""),
+    tax_id: str = Form(""),
+    business_type: str = Form(""),
+    requested_plan_id: str = Form(""),
     db: Session = Depends(get_db),
 ):
+    plans = db.query(SubscriptionPlan).filter(SubscriptionPlan.is_active == True).order_by(SubscriptionPlan.id).all()
+
+    def _err(msg: str):
+        return templates.TemplateResponse(request, "register.html", {"error": msg, "plans": plans})
+
     if password != password_confirm:
-        return templates.TemplateResponse(
-            request,
-            "register.html",
-            {"error": "รหัสผ่านไม่ตรงกัน"},
-        )
+        return _err("รหัสผ่านไม่ตรงกัน")
+    if len(password) < 6:
+        return _err("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร")
     if db.query(Store).filter(Store.username == username).first():
-        return templates.TemplateResponse(
-            request,
-            "register.html",
-            {"error": "ชื่อผู้ใช้นี้มีอยู่แล้ว"},
-        )
+        return _err("ชื่อผู้ใช้นี้มีอยู่แล้ว")
+    if db.query(StaffUser).filter(StaffUser.username == username).first():
+        return _err("ชื่อผู้ใช้นี้มีอยู่แล้ว")
+
+    plan_id: int | None = None
+    if requested_plan_id:
+        try:
+            plan_id = int(requested_plan_id)
+        except ValueError:
+            plan_id = None
+
     store = Store(
-        name=store_name,
-        username=username,
+        name=store_name.strip(),
+        username=username.strip(),
         hashed_password=hash_password(password),
+        phone=phone.strip() or None,
+        email=email.strip() or None,
+        address=address.strip() or None,
+        tax_id=tax_id.strip() or None,
+        business_type=business_type or None,
+        requested_plan_id=plan_id,
+        store_status="active",
+        subscription_status="free",
     )
     db.add(store)
     db.commit()
@@ -281,6 +376,16 @@ def enroll_post(
         return RedirectResponse("/web/login", status_code=302)
     store = ctx["store"]
     role = ctx["role"]
+
+    # Usage limit check
+    limits = _get_plan_limits(store, db)
+    member_count = db.query(Member).filter(Member.store_id == store.id).count()
+    allowed, limit_msg = _check_limit(limits, "max_members", member_count)
+    if not allowed:
+        return templates.TemplateResponse(
+            request, "enroll.html",
+            {"store_name": store.name, "user_role": role, "error": limit_msg},
+        )
 
     # ตรวจสอบเบอร์ซ้ำในร้านเดียวกัน
     if phone:
@@ -411,6 +516,26 @@ def new_bill_post(
     )
     if not member:
         return RedirectResponse("/web/members", status_code=302)
+
+    # Usage limit: receipts per month
+    limits = _get_plan_limits(store, db)
+    now_utc = datetime.now(_tz.utc)
+    month_start = now_utc.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    receipts_this_month = (
+        db.query(Receipt)
+        .join(Transaction)
+        .filter(
+            Transaction.member_id.in_(
+                db.query(Member.id).filter(Member.store_id == store.id).scalar_subquery()
+            ),
+            Receipt.printed_at >= month_start,
+            Receipt.deleted_at == None,
+        )
+        .count()
+    )
+    allowed, limit_msg = _check_limit(limits, "max_receipts_per_month", receipts_this_month)
+    if not allowed:
+        return RedirectResponse(f"/web/members/{member_id}?error=receipt_limit", status_code=302)
 
     items = json.loads(items_json)
     item_total = sum(float(i["qty"]) * float(i["price"]) for i in items)
@@ -1009,6 +1134,12 @@ def product_add(
     if not _is_admin_or_owner(ctx):
         return RedirectResponse("/web/products", status_code=302)
     store = ctx["store"]
+    # Usage limit check
+    limits = _get_plan_limits(store, db)
+    product_count = db.query(Product).filter(Product.store_id == store.id, Product.is_active == True).count()
+    allowed, limit_msg = _check_limit(limits, "max_products", product_count)
+    if not allowed:
+        return RedirectResponse(f"/web/products?limit_error=1", status_code=302)
     p = Product(store_id=store.id, name=name, unit=unit, price=price, category=category)
     db.add(p)
     db.commit()
@@ -1058,7 +1189,6 @@ def product_delete(request: Request, product_id: int, db: Session = Depends(get_
 # ──────────────────────────────────────────
 # จัดการผู้ใช้งาน (Staff Management)  — admin / owner only
 # ──────────────────────────────────────────
-STAFF_LIMIT = 10  # จำนวน staff สูงสุดต่อร้าน (ไม่รวม owner)
 
 
 @router.get("/staff", response_class=HTMLResponse)
@@ -1109,7 +1239,11 @@ def staff_generate(request: Request, db: Session = Depends(get_db)):
 
     existing = db.query(StaffUser).filter(StaffUser.store_id == store.id).all()
     current_count = len(existing)
-    slots_left = STAFF_LIMIT - current_count
+    # Enforce plan limit
+    limits = _get_plan_limits(store, db)
+    plan_max = limits.get("max_staff", 0)
+    effective_max = min(STAFF_LIMIT, plan_max) if plan_max > 0 else STAFF_LIMIT
+    slots_left = effective_max - current_count
     if slots_left <= 0:
         return RedirectResponse("/web/staff?full=1", status_code=302)
 
@@ -1120,7 +1254,6 @@ def staff_generate(request: Request, db: Session = Depends(get_db)):
     for n in range(1, STAFF_LIMIT + 1):
         if len(generated) >= slots_left:
             break
-        username = f"{prefix}{n:02d}"
         password = f"{prefix}{n:02d}"
         # ตรวจว่า username ซ้ำไหม
         if db.query(StaffUser).filter(StaffUser.username == username).first():
@@ -1171,20 +1304,23 @@ def staff_new_post(
         role = "user"
 
     staff_count = db.query(StaffUser).filter(StaffUser.store_id == store.id).count()
+    limits = _get_plan_limits(store, db)
+    plan_max = limits.get("max_staff", 0)
+    effective_staff_limit = min(STAFF_LIMIT, plan_max) if plan_max > 0 else STAFF_LIMIT
 
     def _render_new_form(error: str):
         return templates.TemplateResponse(request, "staff_form.html", {
             "store_name": store.name,
             "user_role": ctx["role"],
             "staff_count": staff_count,
-            "staff_limit": STAFF_LIMIT,
+            "staff_limit": effective_staff_limit,
             "action": "new",
             "form": {"name": name, "username": username, "role": role},
             "error": error,
         })
 
-    if staff_count >= STAFF_LIMIT:
-        return _render_new_form(f"ถึงจำนวนผู้ใช้งานสูงสุดแล้ว ({STAFF_LIMIT} คน)")
+    if staff_count >= effective_staff_limit:
+        return _render_new_form(f"ถึงจำนวนผู้ใช้งานสูงสุดแล้ว ({effective_staff_limit} คน)")
 
     if db.query(StaffUser).filter(StaffUser.username == username).first() or \
        db.query(Store).filter(Store.username == username).first():
@@ -1311,6 +1447,76 @@ def _summary_query(db: Session, store_id: int, start: datetime, end: datetime):
         )
         .all()
     )
+
+
+# ──────────────────────────────────────────
+# Subscription page (store-facing)
+# ──────────────────────────────────────────
+@router.get("/subscription", response_class=HTMLResponse)
+def subscription_page(request: Request, db: Session = Depends(get_db)):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    limits = _get_plan_limits(store, db)
+
+    # Active subscription
+    active_sub = (
+        db.query(StoreSubscription)
+        .filter(
+            StoreSubscription.store_id == store.id,
+            StoreSubscription.status.in_(["active", "grace"]),
+        )
+        .order_by(StoreSubscription.id.desc())
+        .first()
+    )
+    active_plan = None
+    if active_sub:
+        active_plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == active_sub.plan_id).first()
+
+    # Invoice history
+    invoices = (
+        db.query(SubscriptionInvoice)
+        .filter(SubscriptionInvoice.store_id == store.id)
+        .order_by(SubscriptionInvoice.created_at.desc())
+        .all()
+    )
+
+    # Current usage counts
+    now_utc = datetime.now(_tz.utc)
+    month_start = now_utc.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    member_count = db.query(Member).filter(Member.store_id == store.id).count()
+    staff_count = db.query(StaffUser).filter(StaffUser.store_id == store.id).count()
+    product_count = db.query(Product).filter(Product.store_id == store.id, Product.is_active == True).count()
+    receipts_month = (
+        db.query(Receipt)
+        .join(Transaction)
+        .filter(
+            Transaction.member_id.in_(
+                db.query(Member.id).filter(Member.store_id == store.id).scalar_subquery()
+            ),
+            Receipt.printed_at >= month_start,
+            Receipt.deleted_at == None,
+        )
+        .count()
+    )
+
+    usage = {
+        "members": {"current": member_count, "max": limits["max_members"]},
+        "staff": {"current": staff_count, "max": limits["max_staff"]},
+        "products": {"current": product_count, "max": limits["max_products"]},
+        "receipts_month": {"current": receipts_month, "max": limits["max_receipts_per_month"]},
+    }
+
+    return templates.TemplateResponse(request, "subscription.html", {
+        "store_name": store.name,
+        "store": store,
+        "user_role": ctx["role"],
+        "active_sub": active_sub,
+        "active_plan": active_plan,
+        "invoices": invoices,
+        "usage": usage,
+    })
 
 
 @router.get("/summary", response_class=HTMLResponse)

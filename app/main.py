@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from .api import transactions, members
 from .api.auth import router as auth_router
 from .web import router as web_router
+from .admin.web import router as admin_router
 from .models import Base, engine
 
 
@@ -20,6 +21,7 @@ app.include_router(transactions.router, prefix="/transactions", tags=["transacti
 app.include_router(members.router, prefix="/members", tags=["members"])
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(web_router, prefix="/web", tags=["web"])
+app.include_router(admin_router, prefix="/admin", tags=["admin"])
 
 
 @app.get("/health")

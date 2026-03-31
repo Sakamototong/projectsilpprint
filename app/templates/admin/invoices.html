@@ -1,0 +1,67 @@
+{% extends "admin/base.html" %}
+{% block title %}ใบแจ้งชำระ{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-4 gap-2 flex-wrap">
+  <h4 class="fw-bold mb-0 me-auto">ใบแจ้งชำระทั้งหมด</h4>
+  <form method="get" action="/admin/invoices" class="d-flex gap-2 flex-wrap">
+    <select name="status" class="form-select form-select-sm" style="width:150px" onchange="this.form.submit()">
+      <option value="">ทุกสถานะ</option>
+      <option value="pending" {% if status_filter=='pending' %}selected{% endif %}>รอชำระ</option>
+      <option value="paid" {% if status_filter=='paid' %}selected{% endif %}>ชำระแล้ว</option>
+      <option value="overdue" {% if status_filter=='overdue' %}selected{% endif %}>เกินกำหนด</option>
+    </select>
+  </form>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>ร้านค้า</th>
+          <th>งวด</th>
+          <th>รูปแบบ</th>
+          <th>จำนวน</th>
+          <th>สถานะ</th>
+          <th>ครบกำหนด</th>
+          <th>ชำระเมื่อ</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for inv in invoices %}
+      <tr>
+        <td class="text-muted">{{ inv.id }}</td>
+        <td class="fw-semibold">
+          <a href="/admin/stores/{{ inv.store_id }}" class="text-decoration-none">{{ inv.store_name }}</a>
+        </td>
+        <td>{{ inv.period_label or '—' }}</td>
+        <td>{{ 'รายเดือน' if inv.billing_cycle == 'monthly' else 'รายปี' }}</td>
+        <td class="fw-semibold">฿{{ "%.0f"|format(inv.amount) }}</td>
+        <td>
+          {% if inv.status == 'paid' %}<span class="badge bg-success">ชำระแล้ว</span>
+          {% elif inv.status == 'overdue' %}<span class="badge bg-danger">เกินกำหนด</span>
+          {% else %}<span class="badge bg-warning text-dark">รอชำระ</span>{% endif %}
+        </td>
+        <td class="text-muted small">{{ inv.due_date.strftime('%d/%m/%Y') if inv.due_date else '—' }}</td>
+        <td class="text-muted small">{{ inv.paid_at.strftime('%d/%m/%Y') if inv.paid_at else '—' }}</td>
+        <td>
+          {% if inv.status != 'paid' %}
+          <form method="post" action="/admin/invoices/{{ inv.id }}/confirm-payment" class="d-inline">
+            <button class="btn btn-sm btn-success" onclick="return confirm('ยืนยันการชำระเงิน?')">ยืนยัน</button>
+          </form>
+          <form method="post" action="/admin/invoices/{{ inv.id }}/mark-overdue" class="d-inline ms-1">
+            <button class="btn btn-sm btn-outline-danger">ค้างชำระ</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9" class="text-center text-muted py-4">ไม่พบใบแจ้งชำระ</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

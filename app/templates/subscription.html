@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}การสมัครสมาชิก{% endblock %}
+{% block content %}
+<div class="mb-3">
+  <h5 class="fw-bold"><i class="bi bi-credit-card-2-front me-2 text-primary"></i>Subscription & การใช้งาน</h5>
+</div>
+
+<!-- Current Plan Card -->
+<div class="row g-3 mb-4">
+  <div class="col-md-5">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">แผนปัจจุบัน</div>
+        {% if active_plan and store.subscription_status in ('active','grace') %}
+        <h4 class="fw-bold text-primary mb-1">{{ active_plan.name }}</h4>
+        <div class="text-muted small">
+          {{ 'รายปี' if active_sub.billing_cycle == 'yearly' else 'รายเดือน' }}
+          {% if active_sub.expires_at %}
+          · หมดอายุ {{ active_sub.expires_at.strftime('%d/%m/%Y') }}
+          {% endif %}
+        </div>
+        {% if store.subscription_status == 'grace' %}
+        <div class="alert alert-warning py-1 mt-2 small">
+          <i class="bi bi-exclamation-triangle me-1"></i>อยู่ในช่วง Grace Period — กรุณาชำระเงิน
+        </div>
+        {% endif %}
+        {% else %}
+        <h4 class="fw-bold text-secondary mb-1">Free Tier</h4>
+        <div class="text-muted small">ใช้งานได้จำกัด — ติดต่อผู้ดูแลระบบเพื่ออัพเกรด</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Usage Bars -->
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-header bg-white fw-semibold border-0 pt-3">
+    <i class="bi bi-bar-chart me-1 text-primary"></i>การใช้งาน
+  </div>
+  <div class="card-body">
+    <div class="row g-4">
+      {% set items = [
+        ('bi-people', 'สมาชิก', usage.members.current, usage.members.max),
+        ('bi-person-badge', 'ผู้ใช้งาน (Staff)', usage.staff.current, usage.staff.max),
+        ('bi-box', 'สินค้า', usage.products.current, usage.products.max),
+        ('bi-receipt', 'ใบเสร็จ (เดือนนี้)', usage.receipts_month.current, usage.receipts_month.max),
+      ] %}
+      {% for icon, label, current, max_val in items %}
+      <div class="col-md-6">
+        <div class="d-flex justify-content-between mb-1">
+          <span class="small fw-semibold"><i class="bi {{ icon }} me-1"></i>{{ label }}</span>
+          <span class="small text-muted">
+            {{ current }} / {% if max_val == 0 %}∞{% else %}{{ max_val }}{% endif %}
+          </span>
+        </div>
+        {% if max_val == 0 %}
+        <div class="progress" style="height:8px">
+          <div class="progress-bar bg-success" style="width:100%"></div>
+        </div>
+        {% else %}
+        {% set pct = [(current / max_val * 100)|int, 100]|min %}
+        <div class="progress" style="height:8px">
+          <div class="progress-bar {% if pct >= 90 %}bg-danger{% elif pct >= 70 %}bg-warning{% else %}bg-success{% endif %}"
+               style="width:{{ pct }}%"></div>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Invoice History -->
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-white fw-semibold border-0 pt-3">
+    <i class="bi bi-receipt me-1 text-warning"></i>ประวัติใบแจ้งชำระ
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>งวด</th>
+          <th>รูปแบบ</th>
+          <th>จำนวน</th>
+          <th>สถานะ</th>
+          <th>ครบกำหนด</th>
+          <th>ชำระเมื่อ</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for inv in invoices %}
+      <tr>
+        <td class="text-muted">{{ inv.id }}</td>
+        <td>{{ inv.period_label or '—' }}</td>
+        <td>{{ 'รายเดือน' if inv.billing_cycle == 'monthly' else 'รายปี' }}</td>
+        <td class="fw-semibold">฿{{ "%.0f"|format(inv.amount) }}</td>
+        <td>
+          {% if inv.status == 'paid' %}<span class="badge bg-success">ชำระแล้ว</span>
+          {% elif inv.status == 'overdue' %}<span class="badge bg-danger">เกินกำหนด</span>
+          {% else %}<span class="badge bg-warning text-dark">รอชำระ</span>{% endif %}
+        </td>
+        <td class="text-muted small">{{ inv.due_date.strftime('%d/%m/%Y') if inv.due_date else '—' }}</td>
+        <td class="text-muted small">{{ inv.paid_at.strftime('%d/%m/%Y') if inv.paid_at else '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="text-center text-muted py-3">ยังไม่มีประวัติการชำระเงิน</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
