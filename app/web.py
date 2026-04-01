@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from .models import SessionLocal, Store, Member, Transaction, Receipt, BillingProfile, Product, StaffUser, StoreSubscription, SubscriptionPlan
+from .models import SessionLocal, Store, Member, Transaction, Receipt, BillingProfile, Product, StaffUser, StoreSubscription, SubscriptionPlan, SubscriptionInvoice
 from .core.security import hash_password, verify_password, create_access_token, decode_token, validate_password
 from .services.member_service import MemberService
 
