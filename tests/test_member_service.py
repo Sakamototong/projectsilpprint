@@ -28,9 +28,10 @@ def db():
 
 
 def test_points_for_amount():
-    assert MemberService.points_for_amount(1100.0) == 1100
+    assert MemberService.points_for_amount(1100.0) == 11   # 100 บาท = 1 คะแนน
     assert MemberService.points_for_amount(0) == 0
-    assert MemberService.points_for_amount(99.9) == 99
+    assert MemberService.points_for_amount(99.9) == 0      # ไม่ถึง 100 = 0 คะแนน
+    assert MemberService.points_for_amount(500.0) == 5
 
 
 def test_add_points_accumulate(db):

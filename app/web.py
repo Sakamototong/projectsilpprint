@@ -9,9 +9,10 @@ from fastapi import APIRouter, Request, Form, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from .models import SessionLocal, Store, Member, Transaction, Receipt, BillingProfile, Product, StaffUser, StoreSubscription, SubscriptionPlan
-from .core.security import hash_password, verify_password, create_access_token, decode_token
+from .core.security import hash_password, verify_password, create_access_token, decode_token, validate_password
 from .services.member_service import MemberService
 
 BASE_DIR = Path(__file__).parent
@@ -87,6 +88,38 @@ def _get_store(request: Request, db: Session) -> Optional[Store]:
         return None
 
 
+def _auto_check_subscription(store: Store, db: Session):
+    """Automatically transition expired subscriptions to grace/expired status."""
+    if store.subscription_status not in ("active", "grace"):
+        return
+    sub = (
+        db.query(StoreSubscription)
+        .filter(
+            StoreSubscription.store_id == store.id,
+            StoreSubscription.status.in_(["active", "grace"]),
+        )
+        .order_by(StoreSubscription.id.desc())
+        .first()
+    )
+    if not sub:
+        return
+    now = datetime.now(_tz.utc)
+    changed = False
+    if sub.status == "active" and sub.expires_at and now > sub.expires_at:
+        sub.status = "grace"
+        store.subscription_status = "grace"
+        changed = True
+    if sub.status == "grace" and sub.grace_until and now > sub.grace_until:
+        sub.status = "expired"
+        store.subscription_status = "expired"
+        changed = True
+    if changed:
+        db.add(sub)
+        db.add(store)
+        db.commit()
+        db.refresh(store)
+
+
 def _get_user_ctx(request: Request, db: Session) -> Optional[dict]:
     """Return {'store', 'role', 'actor_id', 'actor_name'} or None if unauthenticated."""
     token = request.cookies.get("access_token")
@@ -98,6 +131,11 @@ def _get_user_ctx(request: Request, db: Session) -> Optional[dict]:
         store = db.query(Store).filter(Store.id == store_id).first()
         if not store:
             return None
+        # Block suspended / rejected stores
+        if getattr(store, "store_status", "active") in ("rejected", "suspended"):
+            return None
+        # Auto-check subscription expiry
+        _auto_check_subscription(store, db)
         user_type = payload.get("user_type", "store")
         if user_type == "store":
             role = "owner"
@@ -193,12 +231,13 @@ def login_post(
 ):
     store = db.query(Store).filter(Store.username == username).first()
     if store and verify_password(password, store.hashed_password):
-        # Block rejected stores
-        if getattr(store, "store_status", "active") == "rejected":
+        # Block rejected/suspended stores
+        if getattr(store, "store_status", "active") in ("rejected", "suspended"):
             reason = getattr(store, "rejection_reason", "") or "ไม่ระบุเหตุผล"
+            label = "ถูกปฏิเสธ" if store.store_status == "rejected" else "ถูกระงับ"
             return templates.TemplateResponse(
                 request, "login.html",
-                {"error": f"บัญชีนี้ถูกปฏิเสธ: {reason}"},
+                {"error": f"บัญชีนี้{label}: {reason}"},
             )
         token = create_access_token({
             "sub": str(store.id),
@@ -217,9 +256,9 @@ def login_post(
                 "login.html",
                 {"error": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"},
             )
-        # Check if parent store is rejected
+        # Check if parent store is rejected/suspended
         parent_store = db.query(Store).filter(Store.id == staff.store_id).first()
-        if parent_store and getattr(parent_store, "store_status", "active") == "rejected":
+        if parent_store and getattr(parent_store, "store_status", "active") in ("rejected", "suspended"):
             reason = getattr(parent_store, "rejection_reason", "") or "ไม่ระบุเหตุผล"
             return templates.TemplateResponse(
                 request, "login.html",
@@ -233,7 +272,7 @@ def login_post(
             "staff_role": staff.role,
             "staff_name": staff.name,
         })
-    resp = RedirectResponse("/web/members", status_code=302)
+    resp = RedirectResponse("/web/dashboard", status_code=302)
     resp.set_cookie("access_token", token, httponly=True, samesite="lax", max_age=28800)
     return resp
 
@@ -276,8 +315,9 @@ def register_post(
 
     if password != password_confirm:
         return _err("รหัสผ่านไม่ตรงกัน")
-    if len(password) < 6:
-        return _err("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร")
+    pwd_error = validate_password(password)
+    if pwd_error:
+        return _err(pwd_error)
     if db.query(Store).filter(Store.username == username).first():
         return _err("ชื่อผู้ใช้นี้มีอยู่แล้ว")
     if db.query(StaffUser).filter(StaffUser.username == username).first():
@@ -316,6 +356,7 @@ def members_page(
     request: Request,
     q: str = None,
     enrolled: str = None,
+    page: int = 1,
     db: Session = Depends(get_db),
 ):
     ctx = _get_user_ctx(request, db)
@@ -324,6 +365,10 @@ def members_page(
     store = ctx["store"]
     role = ctx["role"]
 
+    PAGE_SIZE = 20
+    if page < 1:
+        page = 1
+
     query = db.query(Member).filter(Member.store_id == store.id)
     if q:
         query = query.filter(
@@ -331,17 +376,23 @@ def members_page(
             | Member.phone.ilike(f"%{q}%")
             | Member.member_code.ilike(f"%{q}%")
         )
-    members = query.order_by(Member.id.desc()).all()
+    total = query.count()
+    total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    if page > total_pages:
+        page = total_pages
+    members = query.order_by(Member.id.desc()).offset((page - 1) * PAGE_SIZE).limit(PAGE_SIZE).all()
     return templates.TemplateResponse(
         request,
         "members.html",
         {
             "store_name": store.name,
             "members": members,
-            "total": len(members),
+            "total": total,
             "q": q or "",
             "enrolled": enrolled,
             "user_role": role,
+            "page": page,
+            "total_pages": total_pages,
         },
     )
 
@@ -1326,8 +1377,9 @@ def staff_new_post(
        db.query(Store).filter(Store.username == username).first():
         return _render_new_form(f"username '{username}' ถูกใช้งานแล้ว")
 
-    if len(password) < 6:
-        return _render_new_form("รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร")
+    pwd_error = validate_password(password)
+    if pwd_error:
+        return _render_new_form(pwd_error)
 
     su = StaffUser(
         store_id=store.id,
@@ -1787,3 +1839,143 @@ def summary_export(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+# ──────────────────────────────────────────
+# Store owner dashboard
+# ──────────────────────────────────────────
+@router.get("/dashboard", response_class=HTMLResponse)
+def dashboard_page(request: Request, db: Session = Depends(get_db)):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+
+    now = datetime.now()
+    month_start = datetime(now.year, now.month, 1)
+
+    total_members = db.query(Member).filter(Member.store_id == store.id).count()
+    new_members_month = db.query(Member).filter(
+        Member.store_id == store.id,
+        Member.created_at >= month_start,
+    ).count()
+
+    total_receipts = db.query(Receipt).join(Transaction).filter(
+        Transaction.member_id == Member.id,
+        Member.store_id == store.id,
+        Receipt.deleted_at.is_(None),
+    ).count()
+    # simpler: count transactions directly
+    total_tx = db.query(Transaction).join(Member).filter(
+        Member.store_id == store.id
+    ).count()
+    tx_month = db.query(Transaction).join(Member).filter(
+        Member.store_id == store.id,
+        Transaction.timestamp >= month_start,
+    ).count()
+
+    revenue_month = db.query(func.coalesce(func.sum(Transaction.total), 0)).join(Member).filter(
+        Member.store_id == store.id,
+        Transaction.timestamp >= month_start,
+    ).scalar()
+
+    staff_count = db.query(StaffUser).filter(StaffUser.store_id == store.id, StaffUser.is_active == True).count()
+    product_count = db.query(Product).filter(Product.store_id == store.id, Product.is_active == True).count()
+
+    limits = _get_plan_limits(store, db)
+
+    # Recent transactions
+    recent_tx = (
+        db.query(Transaction)
+        .join(Member)
+        .filter(Member.store_id == store.id)
+        .order_by(Transaction.timestamp.desc())
+        .limit(10)
+        .all()
+    )
+
+    # Top 5 members by points
+    top_members = (
+        db.query(Member)
+        .filter(Member.store_id == store.id)
+        .order_by(Member.points.desc())
+        .limit(5)
+        .all()
+    )
+
+    return templates.TemplateResponse(request, "dashboard.html", {
+        "store_name": store.name,
+        "user_role": ctx["role"],
+        "total_members": total_members,
+        "new_members_month": new_members_month,
+        "total_tx": total_tx,
+        "tx_month": tx_month,
+        "revenue_month": revenue_month,
+        "staff_count": staff_count,
+        "product_count": product_count,
+        "limits": limits,
+        "recent_tx": recent_tx,
+        "top_members": top_members,
+    })
+
+
+# ──────────────────────────────────────────
+# Password change
+# ──────────────────────────────────────────
+@router.get("/change-password", response_class=HTMLResponse)
+def change_password_page(request: Request, db: Session = Depends(get_db)):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    return templates.TemplateResponse(request, "change_password.html", {
+        "store_name": ctx["store"].name,
+        "user_role": ctx["role"],
+    })
+
+
+@router.post("/change-password")
+def change_password_post(
+    request: Request,
+    current_password: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+
+    def _err(msg):
+        return templates.TemplateResponse(request, "change_password.html", {
+            "store_name": ctx["store"].name,
+            "user_role": ctx["role"],
+            "error": msg,
+        })
+
+    if new_password != confirm_password:
+        return _err("รหัสผ่านใหม่ไม่ตรงกัน")
+
+    pwd_error = validate_password(new_password)
+    if pwd_error:
+        return _err(pwd_error)
+
+    # Determine which entity to update
+    if ctx["role"] == "owner":
+        store = ctx["store"]
+        if not verify_password(current_password, store.hashed_password):
+            return _err("รหัสผ่านปัจจุบันไม่ถูกต้อง")
+        store.hashed_password = hash_password(new_password)
+        db.add(store)
+    else:
+        staff = db.query(StaffUser).filter(StaffUser.id == ctx["actor_id"]).first()
+        if not staff or not verify_password(current_password, staff.hashed_password):
+            return _err("รหัสผ่านปัจจุบันไม่ถูกต้อง")
+        staff.hashed_password = hash_password(new_password)
+        db.add(staff)
+
+    db.commit()
+    return templates.TemplateResponse(request, "change_password.html", {
+        "store_name": ctx["store"].name,
+        "user_role": ctx["role"],
+        "success": "เปลี่ยนรหัสผ่านสำเร็จ",
+    })

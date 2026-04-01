@@ -31,6 +31,14 @@ class MemberCreate(BaseModel):
     store_id: Optional[int] = None
 
 
+class MemberUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    member_code: Optional[str] = None
+    tier: Optional[str] = None
+
+
 class MemberOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -39,6 +47,13 @@ class MemberOut(BaseModel):
     points: int
     member_code: Optional[str] = None
     tier: Optional[str] = None
+
+
+class PaginatedMembers(BaseModel):
+    items: List[MemberOut]
+    total: int
+    page: int
+    page_size: int
 
 
 class StoreCreate(BaseModel):

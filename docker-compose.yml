@@ -23,6 +23,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/postgres
       - PRINTER_HOST=127.0.0.1
       - PRINTER_PORT=9100
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
     ports:
       - "8000:8000"
     depends_on:

@@ -12,7 +12,7 @@
       <div class="alert alert-danger py-2"><i class="bi bi-exclamation-circle me-1"></i>{{ error }}</div>
       {% endif %}
 
-      <form method="post" action="/web/register">
+      <form method="post" action="/web/register" class="needs-validation" novalidate>
         <p class="fw-semibold text-muted small mb-2">ข้อมูลพื้นฐาน</p>
         <div class="mb-3">
           <label class="form-label fw-semibold">ชื่อร้านค้า <span class="text-danger">*</span></label>
@@ -28,11 +28,11 @@
         <div class="row g-2 mb-3">
           <div class="col">
             <label class="form-label fw-semibold">รหัสผ่าน <span class="text-danger">*</span></label>
-            <input type="password" name="password" id="pw" class="form-control" required minlength="6" placeholder="อย่างน้อย 6 ตัว">
+            <input type="password" name="password" id="pw" class="form-control" required minlength="8" placeholder="อย่างน้อย 8 ตัว">
           </div>
           <div class="col">
             <label class="form-label fw-semibold">ยืนยันรหัสผ่าน <span class="text-danger">*</span></label>
-            <input type="password" name="password_confirm" id="pw2" class="form-control" required minlength="6" placeholder="พิมพ์ซ้ำ">
+            <input type="password" name="password_confirm" id="pw2" class="form-control" required minlength="8" placeholder="พิมพ์ซ้ำ">
           </div>
         </div>
 
