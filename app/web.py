@@ -1020,8 +1020,8 @@ def billing_profiles_page(request: Request, member_id: int, db: Session = Depend
 @router.post("/members/{member_id}/billing-profiles")
 def billing_profiles_post(
     request: Request, member_id: int,
-    label: str = Form(...),
-    company_name: str = Form(""),
+    company_name: str = Form(...),
+    label: str = Form(""),
     tax_id: str = Form(""),
     address: str = Form(""),
     phone: str = Form(""),
@@ -1036,17 +1036,18 @@ def billing_profiles_post(
     member = db.query(Member).filter(Member.id == member_id, Member.store_id == store.id).first()
     if not member:
         return RedirectResponse("/web/members", status_code=302)
+    effective_label = label.strip() or company_name.strip()
     if is_default:
         db.query(BillingProfile).filter(BillingProfile.member_id == member_id).update({"is_default": False})
     bp = BillingProfile(
-        member_id=member_id, label=label,
+        member_id=member_id, label=effective_label,
         company_name=company_name or None, tax_id=tax_id or None,
         address=address or None, phone=phone or None,
         email=email or None, is_default=bool(is_default),
     )
     db.add(bp)
     db.commit()
-    return RedirectResponse(f"/web/members/{member_id}?saved=1", status_code=302)
+    return RedirectResponse(f"/web/members/{member_id}/billing-profiles?saved=1", status_code=302)
 
 
 @router.post("/members/{member_id}/billing-profiles/{bp_id}/delete")
@@ -1059,7 +1060,46 @@ def billing_profile_delete(request: Request, member_id: int, bp_id: int, db: Ses
     if bp:
         db.delete(bp)
         db.commit()
-    return RedirectResponse(f"/web/members/{member_id}", status_code=302)
+    return RedirectResponse(f"/web/members/{member_id}/billing-profiles", status_code=302)
+
+
+@router.post("/members/{member_id}/billing-profiles/{bp_id}/edit")
+def billing_profile_edit(
+    request: Request, member_id: int, bp_id: int,
+    company_name: str = Form(...),
+    label: str = Form(""),
+    tax_id: str = Form(""),
+    address: str = Form(""),
+    phone: str = Form(""),
+    email: str = Form(""),
+    is_default: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    bp = db.query(BillingProfile).filter(
+        BillingProfile.id == bp_id,
+        BillingProfile.member_id == member_id,
+    ).first()
+    if not bp:
+        return RedirectResponse(f"/web/members/{member_id}/billing-profiles", status_code=302)
+    effective_label = label.strip() or company_name.strip()
+    if is_default:
+        db.query(BillingProfile).filter(
+            BillingProfile.member_id == member_id,
+            BillingProfile.id != bp_id,
+        ).update({"is_default": False})
+    bp.label = effective_label
+    bp.company_name = company_name or None
+    bp.tax_id = tax_id or None
+    bp.address = address or None
+    bp.phone = phone or None
+    bp.email = email or None
+    bp.is_default = bool(is_default)
+    db.commit()
+    return RedirectResponse(f"/web/members/{member_id}/billing-profiles?saved=1", status_code=302)
 
 
 # ──────────────────────────────────────────

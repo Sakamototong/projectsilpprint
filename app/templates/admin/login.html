@@ -1,33 +1,50 @@
 {% extends "admin/base.html" %}
 {% block title %}เข้าสู่ระบบ Admin{% endblock %}
+{% block head %}
+<style>
+  body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .main-content { display:flex; align-items:center; justify-content:center; padding:2rem; }
+  .login-wrap { width:100%; max-width:400px; }
+</style>
+{% endblock %}
 {% block content %}
-<div class="row justify-content-center mt-5">
-  <div class="col-12 col-sm-8 col-md-5 col-lg-4">
-    <div class="card shadow-sm border-0 rounded-3">
-      <div class="card-body p-4">
-        <div class="text-center mb-4">
-          <i class="bi bi-shield-fill-check text-primary fs-1"></i>
-          <h4 class="mt-2 fw-bold">SilpPrint Admin</h4>
-          <p class="text-muted small">เฉพาะผู้ดูแลระบบ</p>
-        </div>
-        {% if error %}
-        <div class="alert alert-danger py-2">{{ error }}</div>
-        {% endif %}
-        <form method="post" action="/admin/login">
-          <div class="mb-3">
-            <label class="form-label fw-semibold">Username</label>
-            <input name="username" type="text" class="form-control" autocomplete="username" required>
-          </div>
-          <div class="mb-4">
-            <label class="form-label fw-semibold">Password</label>
-            <input name="password" type="password" class="form-control" autocomplete="current-password" required>
-          </div>
-          <button type="submit" class="btn btn-primary w-100">
-            <i class="bi bi-box-arrow-in-right me-1"></i>เข้าสู่ระบบ
-          </button>
-        </form>
-      </div>
+<div class="login-wrap">
+  <div class="text-center mb-4">
+    <div style="display:inline-flex;align-items:center;justify-content:center;width:54px;height:54px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:14px;margin-bottom:1rem;">
+      <i class="bi bi-shield-fill-check" style="color:#EF4444;font-size:1.5rem;"></i>
     </div>
+    <h4 class="fw-bold mb-1" style="letter-spacing:-.4px;">SilpPrint Admin</h4>
+    <p class="mb-0" style="color:var(--sp-slate);font-size:.85rem;">เฉพาะผู้ดูแลระบบเท่านั้น</p>
+  </div>
+
+  <div class="card p-4">
+    <div style="height:3px;background:linear-gradient(90deg,#EF4444,#F59E0B);border-radius:99px;margin-bottom:1.4rem;"></div>
+
+    {% if error %}
+    <div class="alert alert-danger py-2 mb-3">
+      <i class="bi bi-exclamation-triangle me-1"></i>{{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/admin/login">
+      <div class="mb-3">
+        <label class="form-label">Username</label>
+        <input name="username" type="text" class="form-control form-control-lg"
+               autocomplete="username" required autofocus placeholder="admin">
+      </div>
+      <div class="mb-4">
+        <label class="form-label">Password</label>
+        <input name="password" type="password" class="form-control form-control-lg"
+               autocomplete="current-password" required placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn btn-danger btn-lg w-100">
+        <i class="bi bi-shield-lock me-1"></i>เข้าสู่ระบบ Admin
+      </button>
+    </form>
+
+    <p class="text-center mt-3 mb-0" style="font-size:.8rem;color:var(--sp-slate-dim);">
+      <a href="/web/login" style="color:var(--sp-slate);">← กลับหน้า Store Login</a>
+    </p>
   </div>
 </div>
 {% endblock %}

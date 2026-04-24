@@ -1,62 +1,470 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="th" data-theme="light">
 <head>
+<script>
+  (function(){
+    var t = localStorage.getItem('sp-admin-theme') || 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Admin{% endblock %} — SilpPrint Admin</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    body { background: #f0f2f5; }
-    .sidebar { width: 240px; min-height: 100vh; background: #1a1d23; }
-    .sidebar .nav-link { color: #adb5bd; border-radius: 6px; }
-    .sidebar .nav-link:hover, .sidebar .nav-link.active { background: #2c3040; color: #fff; }
-    .sidebar .brand { color: #fff; font-weight: 700; font-size: 1.1rem; }
-    .main-content { flex: 1; padding: 2rem; overflow-y: auto; }
-    .stat-card { border: none; border-radius: 12px; }
+    :root {
+      --sp-navy:     #0B1120;
+      --sp-card:     #1a2235;
+      --sp-sidebar:  #111827;
+      --sp-blue:     #2563EB;
+      --sp-blue-lt:  #3B82F6;
+      --sp-teal:     #06B6D4;
+      --sp-slate:    #94A3B8;
+      --sp-slate-dim:#64748B;
+      --sp-white:    #F8FAFC;
+      --sp-success:  #10B981;
+      --sp-warning:  #F59E0B;
+      --sp-danger:   #EF4444;
+      --sp-info:     #38BDF8;
+      --sp-border:   rgba(255,255,255,.07);
+      --sp-radius:   12px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--sp-navy);
+      color: var(--sp-white);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 230px;
+      min-height: 100vh;
+      background: var(--sp-sidebar);
+      border-right: 1px solid var(--sp-border);
+      display: flex;
+      flex-direction: column;
+      padding: 1.2rem .75rem;
+      gap: .15rem;
+      flex-shrink: 0;
+    }
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: .55rem;
+      font-weight: 800;
+      font-size: .95rem;
+      color: var(--sp-white);
+      text-decoration: none;
+      padding: .4rem .75rem .75rem;
+      margin-bottom: .4rem;
+      border-bottom: 1px solid var(--sp-border);
+    }
+    .sidebar-brand .brand-icon {
+      width: 30px; height: 30px;
+      background: var(--sp-blue);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      font-size: .85rem;
+    }
+    .sidebar-badge {
+      font-size: .6rem;
+      background: rgba(239,68,68,.2);
+      color: #EF4444;
+      border: 1px solid rgba(239,68,68,.3);
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-weight: 700;
+      letter-spacing: .5px;
+    }
+    .sidebar-label {
+      font-size: .65rem;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--sp-slate-dim);
+      padding: .75rem .75rem .25rem;
+    }
+    .sidebar .nav-link {
+      color: var(--sp-slate);
+      border-radius: 8px;
+      font-size: .85rem;
+      font-weight: 500;
+      padding: .5rem .75rem;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      transition: background .15s, color .15s;
+    }
+    .sidebar .nav-link:hover {
+      background: rgba(255,255,255,.05);
+      color: var(--sp-white);
+    }
+    .sidebar .nav-link.active {
+      background: rgba(37,99,235,.18);
+      color: var(--sp-blue-lt);
+      font-weight: 600;
+    }
+    .sidebar .nav-link.sub {
+      font-size: .8rem;
+      padding-left: 1.75rem;
+      color: var(--sp-slate-dim);
+    }
+    .sidebar .nav-link.sub:hover { color: var(--sp-slate); }
+    .sidebar hr { border-color: var(--sp-border); margin: .5rem 0; }
+
+    /* ── Main content ── */
+    .main-content {
+      flex: 1;
+      padding: 2rem 2rem 3rem;
+      overflow-y: auto;
+      min-width: 0;
+    }
+
+    /* ── Cards ── */
+    .card, .stat-card {
+      background: var(--sp-card) !important;
+      border: 1px solid var(--sp-border) !important;
+      border-radius: var(--sp-radius) !important;
+      box-shadow: none !important;
+      color: var(--sp-white);
+    }
+    .card-header {
+      background: transparent !important;
+      border-bottom: 1px solid var(--sp-border) !important;
+      color: var(--sp-white);
+      font-weight: 600;
+      padding: .8rem 1.1rem;
+    }
+    .card-body { color: var(--sp-white); }
+
+    /* ── Tables ── */
+    .table {
+      --bs-table-bg: transparent;
+      --bs-table-hover-bg: rgba(37,99,235,.06);
+      --bs-table-border-color: var(--sp-border);
+      color: var(--sp-white);
+    }
+    .table thead th {
+      background: rgba(37,99,235,.15) !important;
+      color: var(--sp-blue-lt) !important;
+      border: none !important;
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      padding: .7rem 1rem;
+    }
+    .table tbody tr { border-bottom: 1px solid var(--sp-border); }
+    .table tbody td { padding: .7rem 1rem; vertical-align: middle; }
+    .table-sm td, .table-sm th { padding: .4rem .75rem; }
+
+    /* ── Forms ── */
+    .form-control, .form-select {
+      background: rgba(255,255,255,.04) !important;
+      border: 1px solid var(--sp-border) !important;
+      border-radius: 8px !important;
+      color: var(--sp-white) !important;
+      font-size: .875rem;
+    }
+    .form-control::placeholder { color: var(--sp-slate-dim); }
+    .form-control:focus, .form-select:focus {
+      background: rgba(255,255,255,.06) !important;
+      border-color: var(--sp-blue) !important;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.18) !important;
+      color: var(--sp-white) !important;
+    }
+    .form-label { color: var(--sp-slate); font-weight: 600; font-size: .85rem; }
+    .form-select option { background: var(--sp-card); color: var(--sp-white); }
+    .form-text { color: var(--sp-slate-dim) !important; font-size: .78rem; }
+    .invalid-feedback { color: var(--sp-danger); font-size: .78rem; }
+
+    /* ── Buttons ── */
+    .btn { border-radius: 8px; font-weight: 600; font-size: .85rem; transition: all .2s; border: none; }
+    .btn-primary  { background: var(--sp-blue) !important; border-color: var(--sp-blue) !important; color: #fff !important; }
+    .btn-primary:hover  { background: var(--sp-blue-lt) !important; transform: translateY(-1px); }
+    .btn-success  { background: var(--sp-success) !important; border-color: var(--sp-success) !important; color: #fff !important; }
+    .btn-danger   { background: var(--sp-danger) !important; border-color: var(--sp-danger) !important; color: #fff !important; }
+    .btn-warning  { background: var(--sp-warning) !important; border-color: var(--sp-warning) !important; color: #0B1120 !important; }
+    .btn-secondary, .btn-outline-secondary {
+      background: transparent !important;
+      border: 1px solid var(--sp-border) !important;
+      color: var(--sp-slate) !important;
+    }
+    .btn-secondary:hover, .btn-outline-secondary:hover {
+      background: rgba(255,255,255,.07) !important; color: var(--sp-white) !important;
+    }
+    .btn-outline-primary  { background: transparent !important; border: 1px solid var(--sp-blue) !important; color: var(--sp-blue-lt) !important; }
+    .btn-outline-primary:hover  { background: rgba(37,99,235,.15) !important; }
+    .btn-outline-success  { background: transparent !important; border: 1px solid rgba(16,185,129,.4) !important; color: var(--sp-success) !important; }
+    .btn-outline-success:hover  { background: rgba(16,185,129,.1) !important; }
+    .btn-outline-danger   { background: transparent !important; border: 1px solid rgba(239,68,68,.4) !important; color: var(--sp-danger) !important; }
+    .btn-outline-danger:hover   { background: rgba(239,68,68,.1) !important; }
+    .btn-outline-warning  { background: transparent !important; border: 1px solid rgba(245,158,11,.4) !important; color: var(--sp-warning) !important; }
+    .btn-outline-info     { background: transparent !important; border: 1px solid rgba(56,189,248,.4) !important; color: var(--sp-info) !important; }
+    .btn-sm  { font-size: .77rem !important; padding: .28rem .65rem !important; border-radius: 7px !important; }
+    .btn-lg  { font-size: 1rem !important; padding: .7rem 1.4rem !important; }
+    .btn-close { filter: invert(1); opacity: .4; }
+    .btn-close:hover { opacity: .8; }
+
+    /* ── Badges ── */
+    .badge { border-radius: 5px; font-weight: 600; font-size: .7rem; }
+    .bg-primary   { background: var(--sp-blue) !important; }
+    .bg-secondary  { background: rgba(148,163,184,.15) !important; color: var(--sp-slate) !important; border: 1px solid rgba(148,163,184,.2); }
+    .bg-success   { background: rgba(16,185,129,.15) !important; color: var(--sp-success) !important; border: 1px solid rgba(16,185,129,.2); }
+    .bg-warning   { background: rgba(245,158,11,.15) !important; color: var(--sp-warning) !important; border: 1px solid rgba(245,158,11,.2); }
+    .bg-danger    { background: rgba(239,68,68,.15) !important; color: var(--sp-danger) !important; border: 1px solid rgba(239,68,68,.2); }
+    .bg-info      { background: rgba(56,189,248,.15) !important; color: var(--sp-info) !important; border: 1px solid rgba(56,189,248,.2); }
+
+    /* ── Alerts ── */
+    .alert { border-radius: var(--sp-radius); border: 1px solid; font-size: .875rem; }
+    .alert-success { background: rgba(16,185,129,.1) !important; border-color: rgba(16,185,129,.3) !important; color: #6EE7B7 !important; }
+    .alert-danger  { background: rgba(239,68,68,.1) !important; border-color: rgba(239,68,68,.3) !important; color: #FCA5A5 !important; }
+    .alert-warning { background: rgba(245,158,11,.1) !important; border-color: rgba(245,158,11,.3) !important; color: #FCD34D !important; }
+    .alert-info    { background: rgba(56,189,248,.1) !important; border-color: rgba(56,189,248,.3) !important; color: #7DD3FC !important; }
+
+    /* ── Text utilities ── */
+    .text-muted   { color: var(--sp-slate) !important; }
+    .text-primary { color: var(--sp-blue-lt) !important; }
+    .text-success { color: var(--sp-success) !important; }
+    .text-warning { color: var(--sp-warning) !important; }
+    .text-danger  { color: var(--sp-danger) !important; }
+    .text-info    { color: var(--sp-info) !important; }
+    h1,h2,h3,h4,h5,h6 { color: var(--sp-white); font-weight: 700; }
+    small, .small { color: var(--sp-slate); }
+    hr { border-color: var(--sp-border); opacity: 1; }
+    a  { color: var(--sp-blue-lt); }
+    a:hover { color: var(--sp-teal); }
+
+    /* ── Modal ── */
+    .modal-content {
+      background: var(--sp-card) !important;
+      border: 1px solid var(--sp-border) !important;
+      border-radius: var(--sp-radius) !important;
+      color: var(--sp-white);
+    }
+    .modal-header { border-bottom: 1px solid var(--sp-border) !important; }
+    .modal-footer { border-top:    1px solid var(--sp-border) !important; }
+
+    /* ── Dropdown ── */
+    .dropdown-menu {
+      background: var(--sp-card) !important;
+      border: 1px solid var(--sp-border) !important;
+      border-radius: var(--sp-radius) !important;
+    }
+    .dropdown-item { color: var(--sp-slate) !important; }
+    .dropdown-item:hover { background: rgba(255,255,255,.06) !important; color: var(--sp-white) !important; }
+
+    /* ── Pagination ── */
+    .page-link { background: var(--sp-card) !important; border-color: var(--sp-border) !important; color: var(--sp-slate) !important; }
+    .page-link:hover { background: rgba(37,99,235,.12) !important; color: var(--sp-blue-lt) !important; }
+    .page-item.active .page-link { background: var(--sp-blue) !important; border-color: var(--sp-blue) !important; color: #fff !important; }
+
+    /* ── Progress ── */
+    .progress { background: rgba(255,255,255,.06) !important; border-radius: 99px; }
+    .progress-bar { border-radius: 99px; }
+
+    /* ── Divider ── */
+    .sp-divider {
+      width: 50px; height: 3px;
+      background: linear-gradient(90deg, var(--sp-blue), var(--sp-teal));
+      border-radius: 99px;
+      margin: .4rem 0 1.2rem;
+    }
+
+    /* ════════════════════════════════════════
+       LIGHT THEME OVERRIDES
+       ════════════════════════════════════════ */
+    html[data-theme="light"] {
+      --sp-navy:     #EFF4FF;
+      --sp-card:     #FFFFFF;
+      --sp-sidebar:  #1E293B;
+      --sp-blue:     #2563EB;
+      --sp-blue-lt:  #1D4ED8;
+      --sp-teal:     #0891B2;
+      --sp-slate:    #475569;
+      --sp-slate-dim:#94A3B8;
+      --sp-white:    #0F172A;
+      --sp-success:  #059669;
+      --sp-warning:  #B45309;
+      --sp-danger:   #DC2626;
+      --sp-info:     #0284C7;
+      --sp-border:   rgba(0,0,0,.09);
+    }
+    html[data-theme="light"] body {
+      background: #EFF4FF;
+      color: #0F172A;
+    }
+    /* sidebar stays dark in light mode for contrast */
+    html[data-theme="light"] .sidebar {
+      background: #1E293B;
+      border-right-color: rgba(255,255,255,.06);
+    }
+    html[data-theme="light"] .sidebar .nav-link { color: #94A3B8; }
+    html[data-theme="light"] .sidebar .nav-link:hover { background: rgba(255,255,255,.06); color: #F8FAFC; }
+    html[data-theme="light"] .sidebar .nav-link.active { background: rgba(37,99,235,.2); color: #93C5FD; }
+    html[data-theme="light"] .sidebar-label { color: #64748B; }
+    html[data-theme="light"] .sidebar-brand { color: #F8FAFC; }
+
+    /* main area */
+    html[data-theme="light"] .card,
+    html[data-theme="light"] .stat-card {
+      background: #FFFFFF !important;
+      border: 1px solid rgba(0,0,0,.08) !important;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06) !important;
+      color: #0F172A;
+    }
+    html[data-theme="light"] .card-header {
+      background: #F8FAFC !important;
+      border-bottom: 1px solid rgba(0,0,0,.08) !important;
+      color: #0F172A;
+    }
+    html[data-theme="light"] .card-body { color: #0F172A; }
+    html[data-theme="light"] .table {
+      --bs-table-bg: transparent;
+      --bs-table-hover-bg: rgba(37,99,235,.04);
+      --bs-table-border-color: rgba(0,0,0,.07);
+      color: #0F172A;
+    }
+    html[data-theme="light"] .table thead th {
+      background: rgba(37,99,235,.08) !important;
+      color: #1D4ED8 !important;
+    }
+    html[data-theme="light"] .table tbody tr { border-bottom: 1px solid rgba(0,0,0,.06); }
+    html[data-theme="light"] .form-control,
+    html[data-theme="light"] .form-select {
+      background: #FFFFFF !important;
+      border: 1px solid rgba(0,0,0,.14) !important;
+      color: #0F172A !important;
+    }
+    html[data-theme="light"] .form-control::placeholder { color: #94A3B8; }
+    html[data-theme="light"] .form-control:focus,
+    html[data-theme="light"] .form-select:focus {
+      background: #FFFFFF !important;
+      border-color: var(--sp-blue) !important;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.12) !important;
+      color: #0F172A !important;
+    }
+    html[data-theme="light"] .form-label { color: #334155; }
+    html[data-theme="light"] .form-select option { background: #fff; color: #0F172A; }
+    html[data-theme="light"] .btn-secondary,
+    html[data-theme="light"] .btn-outline-secondary {
+      border: 1px solid rgba(0,0,0,.14) !important;
+      color: #475569 !important;
+    }
+    html[data-theme="light"] .btn-secondary:hover,
+    html[data-theme="light"] .btn-outline-secondary:hover {
+      background: rgba(0,0,0,.05) !important; color: #0F172A !important;
+    }
+    html[data-theme="light"] .bg-secondary { background: rgba(71,85,105,.12) !important; color: #475569 !important; }
+    html[data-theme="light"] .bg-success   { background: rgba(5,150,105,.1) !important; color: #059669 !important; }
+    html[data-theme="light"] .bg-warning   { background: rgba(180,83,9,.1) !important; color: #B45309 !important; }
+    html[data-theme="light"] .bg-danger    { background: rgba(220,38,38,.1) !important; color: #DC2626 !important; }
+    html[data-theme="light"] .bg-info      { background: rgba(2,132,199,.1) !important; color: #0284C7 !important; }
+    html[data-theme="light"] .alert-success { background: rgba(5,150,105,.08) !important; border-color: rgba(5,150,105,.25) !important; color: #065F46 !important; }
+    html[data-theme="light"] .alert-danger  { background: rgba(220,38,38,.07) !important; border-color: rgba(220,38,38,.25) !important; color: #991B1B !important; }
+    html[data-theme="light"] .alert-warning { background: rgba(180,83,9,.07) !important; border-color: rgba(180,83,9,.25) !important; color: #92400E !important; }
+    html[data-theme="light"] .alert-info    { background: rgba(2,132,199,.07) !important; border-color: rgba(2,132,199,.25) !important; color: #075985 !important; }
+    html[data-theme="light"] .text-muted    { color: #64748B !important; }
+    html[data-theme="light"] .text-primary  { color: #1D4ED8 !important; }
+    html[data-theme="light"] small, html[data-theme="light"] .small { color: #64748B; }
+    html[data-theme="light"] hr { border-color: rgba(0,0,0,.1); }
+    html[data-theme="light"] a  { color: #1D4ED8; }
+    html[data-theme="light"] a:hover { color: #0891B2; }
+    html[data-theme="light"] h1,html[data-theme="light"] h2,html[data-theme="light"] h3,
+    html[data-theme="light"] h4,html[data-theme="light"] h5,html[data-theme="light"] h6 { color: #0F172A; }
+    html[data-theme="light"] .modal-content { background: #fff !important; border: 1px solid rgba(0,0,0,.1) !important; color: #0F172A; }
+    html[data-theme="light"] .modal-header { border-bottom: 1px solid rgba(0,0,0,.08) !important; }
+    html[data-theme="light"] .modal-footer { border-top:    1px solid rgba(0,0,0,.08) !important; }
+    html[data-theme="light"] .dropdown-menu { background: #fff !important; border: 1px solid rgba(0,0,0,.1) !important; }
+    html[data-theme="light"] .dropdown-item { color: #334155 !important; }
+    html[data-theme="light"] .dropdown-item:hover { background: rgba(0,0,0,.05) !important; color: #0F172A !important; }
+    html[data-theme="light"] .page-link { background: #fff !important; border-color: rgba(0,0,0,.12) !important; color: #475569 !important; }
+    html[data-theme="light"] .page-link:hover { background: rgba(37,99,235,.07) !important; color: #1D4ED8 !important; }
+    html[data-theme="light"] .progress { background: rgba(0,0,0,.07) !important; }
+    html[data-theme="light"] .btn-close { filter: none; opacity: .5; }
+
+    /* Toggle button */
+    #sp-theme-toggle {
+      width: 30px; height: 30px;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 7px;
+      color: #94A3B8;
+      cursor: pointer;
+      font-size: .9rem;
+      transition: background .2s;
+      margin-bottom: .5rem;
+    }
+    #sp-theme-toggle:hover { background: rgba(255,255,255,.08); color: #F8FAFC; }
   </style>
+  {% block head %}{% endblock %}
 </head>
 <body>
 <div class="d-flex" style="min-height:100vh">
   {% if admin_ctx %}
-  <div class="sidebar d-flex flex-column p-3 gap-1">
-    <a class="brand mb-3 text-decoration-none d-flex align-items-center gap-2" href="/admin/dashboard">
-      <i class="bi bi-shield-fill-check text-primary fs-5"></i> SilpPrint Admin
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar">
+    <a class="sidebar-brand" href="/admin/dashboard">
+      <div class="brand-icon"><i class="bi bi-shield-fill-check" style="color:#fff;"></i></div>
+      <span>SilpPrint</span>
+      <span class="sidebar-badge ms-auto">ADMIN</span>
     </a>
-    <a href="/admin/dashboard" class="nav-link px-3 py-2 {% if active_page=='dashboard' %}active{% endif %}">
-      <i class="bi bi-speedometer2 me-2"></i>Dashboard
+
+    <div class="sidebar-label">หลัก</div>
+    <a href="/admin/dashboard" class="nav-link {% if active_page=='dashboard' %}active{% endif %}">
+      <i class="bi bi-speedometer2"></i>Dashboard
     </a>
-    <a href="/admin/stores" class="nav-link px-3 py-2 {% if active_page=='stores' %}active{% endif %}">
-      <i class="bi bi-shop me-2"></i>ร้านค้า
+    <a href="/admin/stores" class="nav-link {% if active_page=='stores' %}active{% endif %}">
+      <i class="bi bi-shop"></i>ร้านค้า
     </a>
-    <a href="/admin/plans" class="nav-link px-3 py-2 {% if active_page=='plans' %}active{% endif %}">
-      <i class="bi bi-card-list me-2"></i>แผนการสมัคร
+    <a href="/admin/plans" class="nav-link {% if active_page=='plans' %}active{% endif %}">
+      <i class="bi bi-card-list"></i>แผนการสมัคร
     </a>
-    <a href="/admin/invoices" class="nav-link px-3 py-2 {% if active_page=='invoices' %}active{% endif %}">
-      <i class="bi bi-receipt me-2"></i>ใบแจ้งชำระ
+    <a href="/admin/invoices" class="nav-link {% if active_page=='invoices' %}active{% endif %}">
+      <i class="bi bi-receipt"></i>ใบแจ้งชำระ
     </a>
-    <a href="/admin/users" class="nav-link px-3 py-2 {% if active_page=='users' %}active{% endif %}">
-      <i class="bi bi-people me-2"></i>ผู้ใช้งาน
+
+    <div class="sidebar-label">จัดการ</div>
+    <a href="/admin/users" class="nav-link {% if active_page=='users' %}active{% endif %}">
+      <i class="bi bi-people"></i>ผู้ใช้งาน
     </a>
-    <a href="/admin/usage" class="nav-link px-3 py-2 {% if active_page=='usage' %}active{% endif %}">
-      <i class="bi bi-bar-chart me-2"></i>การใช้งาน
+    <a href="/admin/usage" class="nav-link {% if active_page=='usage' %}active{% endif %}">
+      <i class="bi bi-bar-chart"></i>การใช้งาน
     </a>
-    <hr class="border-secondary my-2">
-    <a href="/admin/reports" class="nav-link px-3 py-2 {% if active_page=='reports' %}active{% endif %}">
-      <i class="bi bi-file-earmark-bar-graph me-2"></i>รายงาน
+
+    <div class="sidebar-label">รายงาน</div>
+    <a href="/admin/reports" class="nav-link {% if active_page=='reports' %}active{% endif %}">
+      <i class="bi bi-file-earmark-bar-graph"></i>รายงานรวม
     </a>
-    <a href="/admin/reports/billing" class="nav-link px-3 py-2 {% if active_page=='reports' and request.url.path.endswith('billing') %}active{% endif %} ps-4 small text-secondary">
-      <i class="bi bi-arrow-right-short me-1"></i>การเรียกเก็บ
+    <a href="/admin/reports/billing" class="nav-link sub">
+      <i class="bi bi-arrow-right-short"></i>การเรียกเก็บ
     </a>
-    <div class="mt-auto border-top border-secondary pt-3">
+
+    <div class="mt-auto pt-3" style="border-top:1px solid rgba(255,255,255,.07);">
+      <div style="font-size:.78rem;color:#64748B;padding:.3rem .75rem .5rem;">
+        <i class="bi bi-person-circle me-1"></i>{{ admin_ctx.username }}
+      </div>
+      <button id="sp-theme-toggle" onclick="spToggleTheme()" title="สลับธีม" style="width:100%;border-radius:7px;margin-bottom:.4rem;">
+        <i id="sp-theme-icon" class="bi bi-sun-fill me-1"></i>
+        <span id="sp-theme-label" style="font-size:.77rem;">Light Mode</span>
+      </button>
       <form method="post" action="/admin/logout">
-        <button class="btn btn-sm btn-outline-danger w-100">
+        <button class="btn btn-outline-danger btn-sm w-100">
           <i class="bi bi-box-arrow-right me-1"></i>ออกจากระบบ
         </button>
       </form>
     </div>
-  </div>
+  </aside>
   {% endif %}
+
+  <!-- ═══ MAIN ═══ -->
   <div class="main-content">
     {% if flash_msg %}
     <div class="alert alert-{{ flash_type|default('success') }} alert-dismissible fade show mb-3" role="alert">
@@ -68,6 +476,29 @@
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function spToggleTheme() {
+  var html = document.documentElement;
+  var cur = html.getAttribute('data-theme') || 'dark';
+  var next = cur === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('sp-admin-theme', next);
+  spUpdateThemeBtn(next);
+}
+function spUpdateThemeBtn(theme) {
+  var icon  = document.getElementById('sp-theme-icon');
+  var label = document.getElementById('sp-theme-label');
+  if (!icon || !label) return;
+  if (theme === 'dark') {
+    icon.className  = 'bi bi-sun-fill me-1';
+    label.textContent = 'Light Mode';
+  } else {
+    icon.className  = 'bi bi-moon-fill me-1';
+    label.textContent = 'Dark Mode';
+  }
+}
+spUpdateThemeBtn(document.documentElement.getAttribute('data-theme') || 'light');
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,49 +1,91 @@
 {% extends "base.html" %}
 {% block title %}Dashboard – SilpPrint{% endblock %}
+{% block head %}
+<style>
+  .kpi-card { position: relative; overflow: hidden; }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: -30px; right: -30px;
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    opacity: .06;
+  }
+  .kpi-card.kpi-blue::before  { background: var(--sp-blue-lt); }
+  .kpi-card.kpi-teal::before  { background: var(--sp-teal); }
+  .kpi-card.kpi-green::before { background: var(--sp-success); }
+  .kpi-card.kpi-yellow::before{ background: var(--sp-warning); }
+  .kpi-icon {
+    width: 44px; height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 10px;
+    font-size: 1.2rem;
+    margin-bottom: .75rem;
+  }
+</style>
+{% endblock %}
 {% block content %}
 
-<h5 class="fw-bold mb-3">
-  <i class="bi bi-speedometer2 text-primary me-2"></i>Dashboard
-</h5>
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h5 class="fw-bold mb-1" style="letter-spacing:-.3px;">
+      <i class="bi bi-speedometer2 me-2" style="color:var(--sp-blue-lt);"></i>Dashboard
+    </h5>
+    <div class="sp-divider"></div>
+  </div>
+  <a href="/web/enroll" class="btn btn-primary btn-sm">
+    <i class="bi bi-person-plus me-1"></i>สมัครสมาชิก
+  </a>
+</div>
 
 <!-- KPI Cards -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-lg-3">
-    <div class="card h-100">
-      <div class="card-body text-center">
-        <i class="bi bi-people-fill text-primary display-6"></i>
-        <h3 class="mt-2 mb-0">{{ total_members }}</h3>
-        <small class="text-muted">สมาชิกทั้งหมด</small>
-        <div class="text-success small">+{{ new_members_month }} เดือนนี้</div>
+    <div class="card kpi-card kpi-blue h-100">
+      <div class="card-body">
+        <div class="kpi-icon" style="background:rgba(37,99,235,.15);">
+          <i class="bi bi-people-fill" style="color:var(--sp-blue-lt);"></i>
+        </div>
+        <div class="fs-3 fw-bold">{{ total_members }}</div>
+        <div style="color:var(--sp-slate);font-size:.8rem;">สมาชิกทั้งหมด</div>
+        <div class="mt-1" style="color:var(--sp-success);font-size:.78rem;">
+          <i class="bi bi-arrow-up-short"></i>+{{ new_members_month }} เดือนนี้
+        </div>
       </div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="card h-100">
-      <div class="card-body text-center">
-        <i class="bi bi-receipt text-info display-6"></i>
-        <h3 class="mt-2 mb-0">{{ tx_month }}</h3>
-        <small class="text-muted">รายการเดือนนี้</small>
-        <div class="text-muted small">ทั้งหมด {{ total_tx }}</div>
+    <div class="card kpi-card kpi-teal h-100">
+      <div class="card-body">
+        <div class="kpi-icon" style="background:rgba(6,182,212,.15);">
+          <i class="bi bi-receipt" style="color:var(--sp-teal);"></i>
+        </div>
+        <div class="fs-3 fw-bold">{{ tx_month }}</div>
+        <div style="color:var(--sp-slate);font-size:.8rem;">รายการเดือนนี้</div>
+        <div class="mt-1" style="color:var(--sp-slate-dim);font-size:.78rem;">ทั้งหมด {{ total_tx }} รายการ</div>
       </div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="card h-100">
-      <div class="card-body text-center">
-        <i class="bi bi-currency-exchange text-success display-6"></i>
-        <h3 class="mt-2 mb-0">{{ "{:,.2f}".format(revenue_month) }}</h3>
-        <small class="text-muted">รายได้เดือนนี้ (฿)</small>
+    <div class="card kpi-card kpi-green h-100">
+      <div class="card-body">
+        <div class="kpi-icon" style="background:rgba(16,185,129,.15);">
+          <i class="bi bi-currency-exchange" style="color:var(--sp-success);"></i>
+        </div>
+        <div class="fs-3 fw-bold">{{ "{:,.0f}".format(revenue_month) }}</div>
+        <div style="color:var(--sp-slate);font-size:.8rem;">รายได้เดือนนี้ (฿)</div>
       </div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
-    <div class="card h-100">
-      <div class="card-body text-center">
-        <i class="bi bi-person-badge text-warning display-6"></i>
-        <h3 class="mt-2 mb-0">{{ staff_count }}</h3>
-        <small class="text-muted">พนักงาน</small>
-        <div class="text-muted small">สินค้า {{ product_count }}</div>
+    <div class="card kpi-card kpi-yellow h-100">
+      <div class="card-body">
+        <div class="kpi-icon" style="background:rgba(245,158,11,.12);">
+          <i class="bi bi-person-badge" style="color:var(--sp-warning);"></i>
+        </div>
+        <div class="fs-3 fw-bold">{{ staff_count }}</div>
+        <div style="color:var(--sp-slate);font-size:.8rem;">พนักงาน</div>
+        <div class="mt-1" style="color:var(--sp-slate-dim);font-size:.78rem;">สินค้า {{ product_count }} รายการ</div>
       </div>
     </div>
   </div>
@@ -51,25 +93,27 @@
 
 <!-- Usage vs Limits -->
 <div class="card mb-4">
-  <div class="card-header fw-bold"><i class="bi bi-bar-chart me-1"></i>การใช้งาน vs แผน</div>
+  <div class="card-header">
+    <i class="bi bi-bar-chart me-2" style="color:var(--sp-blue-lt);"></i>การใช้งาน vs แผน
+  </div>
   <div class="card-body">
-    <div class="row g-3">
+    <div class="row g-4">
       {% set items = [
-        ("สมาชิก", total_members, limits.max_members),
-        ("พนักงาน", staff_count, limits.max_staff),
-        ("สินค้า", product_count, limits.max_products),
-        ("ใบเสร็จ/เดือน", tx_month, limits.max_receipts_per_month),
+        ("สมาชิก", total_members, limits.max_members, "var(--sp-blue-lt)"),
+        ("พนักงาน", staff_count, limits.max_staff, "var(--sp-teal)"),
+        ("สินค้า", product_count, limits.max_products, "var(--sp-success)"),
+        ("ใบเสร็จ/เดือน", tx_month, limits.max_receipts_per_month, "var(--sp-warning)"),
       ] %}
-      {% for label, cur, mx in items %}
+      {% for label, cur, mx, clr in items %}
       <div class="col-md-6 col-lg-3">
-        <div class="d-flex justify-content-between small mb-1">
-          <span>{{ label }}</span>
-          <span>{{ cur }}/{{ mx if mx > 0 else '∞' }}</span>
+        <div class="d-flex justify-content-between mb-2">
+          <span style="font-size:.82rem;color:var(--sp-slate);">{{ label }}</span>
+          <span style="font-size:.82rem;font-weight:600;color:{{ clr }};">{{ cur }}/{{ mx if mx > 0 else '∞' }}</span>
         </div>
         {% set pct = (cur / mx * 100) if mx > 0 else 0 %}
-        <div class="progress" style="height: 8px;">
+        <div class="progress" style="height:6px;">
           <div class="progress-bar {% if pct > 90 %}bg-danger{% elif pct > 70 %}bg-warning{% else %}bg-primary{% endif %}"
-               style="width: {{ pct|int }}%"></div>
+               style="width:{{ pct|int }}%;"></div>
         </div>
       </div>
       {% endfor %}
@@ -81,7 +125,9 @@
   <!-- Recent Transactions -->
   <div class="col-lg-7">
     <div class="card h-100">
-      <div class="card-header fw-bold"><i class="bi bi-clock-history me-1"></i>รายการล่าสุด</div>
+      <div class="card-header">
+        <i class="bi bi-clock-history me-2" style="color:var(--sp-teal);"></i>รายการล่าสุด
+      </div>
       <div class="card-body p-0">
         <table class="table table-sm table-hover align-middle mb-0">
           <thead>
@@ -90,14 +136,14 @@
           <tbody>
           {% for tx in recent_tx %}
             <tr>
-              <td class="small text-muted">{{ tx.id }}</td>
+              <td style="color:var(--sp-slate-dim);font-size:.8rem;">{{ tx.id }}</td>
               <td>{{ tx.member.name if tx.member else '–' }}</td>
-              <td class="fw-semibold">{{ "{:,.2f}".format(tx.total) }}</td>
+              <td class="fw-semibold" style="color:var(--sp-success);">{{ "{:,.2f}".format(tx.total) }}</td>
               <td><span class="badge bg-secondary">{{ tx.payment_method or '–' }}</span></td>
-              <td class="small text-muted">{{ tx.timestamp.strftime('%d/%m %H:%M') if tx.timestamp else '–' }}</td>
+              <td style="color:var(--sp-slate);font-size:.78rem;">{{ tx.timestamp.strftime('%d/%m %H:%M') if tx.timestamp else '–' }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="5" class="text-center text-muted py-3">ยังไม่มีรายการ</td></tr>
+            <tr><td colspan="5" class="text-center py-4" style="color:var(--sp-slate);">ยังไม่มีรายการ</td></tr>
           {% endfor %}
           </tbody>
         </table>
@@ -107,7 +153,9 @@
   <!-- Top Members -->
   <div class="col-lg-5">
     <div class="card h-100">
-      <div class="card-header fw-bold"><i class="bi bi-star-fill text-warning me-1"></i>สมาชิกคะแนนสูงสุด</div>
+      <div class="card-header">
+        <i class="bi bi-star-fill me-2" style="color:var(--sp-warning);"></i>สมาชิกคะแนนสูงสุด
+      </div>
       <div class="card-body p-0">
         <table class="table table-sm table-hover align-middle mb-0">
           <thead>
@@ -116,16 +164,16 @@
           <tbody>
           {% for m in top_members %}
             <tr>
-              <td><a href="/web/members/{{ m.id }}">{{ m.name }}</a></td>
+              <td><a href="/web/members/{{ m.id }}" style="color:var(--sp-blue-lt);">{{ m.name }}</a></td>
               <td>
                 <span class="badge tier-{{ m.tier or 'general' }}">
                   {{ {'general':'ทั่วไป','silver':'Silver','gold':'Gold','platinum':'Platinum'}.get(m.tier, m.tier) }}
                 </span>
               </td>
-              <td class="fw-semibold">{{ m.points }}</td>
+              <td class="fw-semibold" style="color:var(--sp-teal);">{{ m.points }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="3" class="text-center text-muted py-3">–</td></tr>
+            <tr><td colspan="3" class="text-center py-4" style="color:var(--sp-slate);">–</td></tr>
           {% endfor %}
           </tbody>
         </table>
@@ -135,3 +183,4 @@
 </div>
 
 {% endblock %}
+

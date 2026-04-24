@@ -322,18 +322,39 @@
 @media print {
   @page { size: A4 portrait; margin: 10mm; }
 
-  body * { visibility: hidden !important; }
-  .a4-sheet, .a4-sheet * { visibility: visible !important; }
+  /* ── hide chrome ── */
+  nav.navbar,
+  .d-print-none { display: none !important; }
+  .container-fluid { padding: 0 !important; margin: 0 !important; }
+  body { background: #fff !important; }
+
+  /* ── sheet fills the printable area ── */
   .a4-sheet {
-    position: fixed; inset: 0;
-    width: 100%; height: 100%;
-    padding: 0; margin: 0;
+    width: 190mm;          /* A4 210mm − 2×10mm margin */
+    padding: 0;
+    margin: 0;
     box-shadow: none;
+    background: #fff;
   }
-  .rc       { height: 133mm; overflow: hidden; }
-  .rc-divider { margin: 1mm 0; }
-  nav.navbar, .d-print-none { display: none !important; }
-  .container-fluid { padding: 0 !important; }
+
+  /* ── each copy tries to be half-page; if it can't fit, browser
+        pushes it to the next page intact (no slicing) ── */
+  .rc {
+    min-height: 130mm;     /* aim for half an A4 */
+    overflow: visible;     /* never clip content */
+    break-inside: avoid;   /* keep a copy on one page */
+    page-break-inside: avoid;
+  }
+
+  /* ── divider: allow a page-break here if needed ── */
+  .rc-divider {
+    margin: 2mm 0;
+    break-before: auto;
+    page-break-before: auto;
+  }
+
+  /* ── keep filler rows visible so spacing is consistent ── */
+  .items-table .filler { display: table-row; }
 }
 </style>
 {% endblock %}

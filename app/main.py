@@ -1,8 +1,10 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -26,9 +28,12 @@ async def lifespan(app: FastAPI):
     yield
 
 
+_BASE_DIR = Path(__file__).parent
+
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="ProjectSilpPrint", lifespan=lifespan)
 app.state.limiter = limiter
+templates = Jinja2Templates(directory=str(_BASE_DIR / "templates"))
 
 
 @app.exception_handler(RateLimitExceeded)
@@ -56,6 +61,11 @@ def health():
     except Exception:
         return JSONResponse({"status": "degraded", "db": "unreachable"}, status_code=503)
     return JSONResponse({"status": "ok"})
+
+
+@app.get("/payment", response_class=HTMLResponse)
+async def payment_gateway(request: Request):
+    return templates.TemplateResponse(request, "payment_gateway.html")
 
 
 @app.get("/")

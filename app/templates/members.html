@@ -16,11 +16,14 @@
 </div>
 {% endif %}
 
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-  <h5 class="mb-0 fw-bold">
-    <i class="bi bi-people-fill text-primary me-2"></i>รายชื่อสมาชิก
-    <span class="badge bg-secondary ms-1">{{ total }}</span>
-  </h5>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <div>
+    <h5 class="mb-1 fw-bold" style="letter-spacing:-.3px;">
+      <i class="bi bi-people-fill me-2" style="color:var(--sp-blue-lt);"></i>รายชื่อสมาชิก
+      <span class="badge bg-secondary ms-1">{{ total }}</span>
+    </h5>
+    <div class="sp-divider"></div>
+  </div>
   <a href="/web/enroll" class="btn btn-primary">
     <i class="bi bi-person-plus-fill me-1"></i>สมัครสมาชิกใหม่
   </a>
@@ -76,11 +79,11 @@
               </span>
             </td>
             <td>
-              <span class="badge bg-warning text-dark points-badge">
+              <span class="badge points-badge" style="background:rgba(6,182,212,.15);color:var(--sp-teal);border:1px solid rgba(6,182,212,.25);">
                 <i class="bi bi-star-fill me-1"></i>{{ m.points }}
               </span>
             </td>
-            <td class="small text-muted">
+            <td style="color:var(--sp-slate);font-size:.8rem;">
               {{ m.created_at.strftime('%d/%m/%Y') if m.created_at else '–' }}
             </td>
             <td>
@@ -91,9 +94,9 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="8" class="text-center text-muted py-5">
-              <i class="bi bi-inbox display-6 d-block mb-2"></i>
-              {% if q %}ไม่พบสมาชิกที่ค้นหา{% else %}ยังไม่มีสมาชิก กด <strong>สมัครสมาชิกใหม่</strong> เพื่อเริ่มต้น{% endif %}
+            <td colspan="8" class="text-center py-5" style="color:var(--sp-slate);">
+              <i class="bi bi-inbox" style="font-size:2.5rem;color:var(--sp-slate-dim);display:block;margin-bottom:.75rem;"></i>
+              {% if q %}ไม่พบสมาชิกที่ค้นหา{% else %}ยังไม่มีสมาชิก กด <strong style="color:var(--sp-white);">สมัครสมาชิกใหม่</strong> เพื่อเริ่มต้น{% endif %}
             </td>
           </tr>
           {% endfor %}

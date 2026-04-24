@@ -1,45 +1,67 @@
 {% extends "base.html" %}
 {% block title %}เข้าสู่ระบบ – SilpPrint{% endblock %}
+{% block head %}
+<style>
+  body { display: flex; flex-direction: column; min-height: 100vh; }
+  .container-fluid.px-4.py-4 { flex: 1; display: flex; align-items: center; justify-content: center; }
+  .login-wrap { width: 100%; max-width: 420px; }
+  .login-logo { display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; background: var(--sp-blue); border-radius: 14px; margin-bottom: 1.2rem; }
+</style>
+{% endblock %}
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-sm-10 col-md-6 col-lg-4">
-    <div class="text-center mb-4">
-      <i class="bi bi-receipt-cutoff text-primary" style="font-size:3rem;"></i>
-      <h4 class="mt-2 fw-bold">SilpPrint</h4>
-      <p class="text-muted">ระบบสมาชิกและพิมพ์ใบเสร็จ</p>
+<div class="login-wrap">
+
+  <!-- Logo + brand -->
+  <div class="text-center mb-4">
+    <div class="login-logo mx-auto">
+      <svg width="30" height="30" viewBox="0 0 28 28" fill="none">
+        <path d="M7 10h14M7 14h9M7 18h11" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+      </svg>
     </div>
+    <h4 class="fw-bold mb-1" style="letter-spacing:-.5px;">SilpPrint</h4>
+    <p class="mb-0" style="color:var(--sp-slate);font-size:.875rem;">ระบบสมาชิกและพิมพ์ใบเสร็จ</p>
+  </div>
 
-    <div class="card p-4">
-      <h5 class="card-title mb-4 fw-bold"><i class="bi bi-lock-fill text-primary me-2"></i>เข้าสู่ระบบร้านค้า</h5>
+  <div class="card p-4">
+    <!-- Glow line -->
+    <div style="height:3px;background:linear-gradient(90deg,var(--sp-blue),var(--sp-teal));border-radius:99px;margin-bottom:1.5rem;"></div>
 
-      {% if error %}
-      <div class="alert alert-danger py-2"><i class="bi bi-exclamation-circle me-1"></i>{{ error }}</div>
-      {% endif %}
+    <h5 class="fw-bold mb-4" style="font-size:1rem;letter-spacing:-.3px;">
+      <i class="bi bi-lock-fill me-2" style="color:var(--sp-blue-lt);"></i>เข้าสู่ระบบร้านค้า
+    </h5>
 
-      {% if request.query_params.get('registered') %}
-      <div class="alert alert-success py-2"><i class="bi bi-check-circle me-1"></i>ลงทะเบียนสำเร็จ กรุณาเข้าสู่ระบบ</div>
-      {% endif %}
-
-      <form method="post" action="/web/login" class="needs-validation" novalidate>
-        <div class="mb-3">
-          <label class="form-label fw-semibold">ชื่อผู้ใช้</label>
-          <input type="text" name="username" class="form-control form-control-lg" required autofocus placeholder="username">
-        </div>
-        <div class="mb-4">
-          <label class="form-label fw-semibold">รหัสผ่าน</label>
-          <input type="password" name="password" class="form-control form-control-lg" required placeholder="••••••••">
-        </div>
-        <button type="submit" class="btn btn-primary btn-lg w-100">
-          <i class="bi bi-box-arrow-in-right me-1"></i>เข้าสู่ระบบ
-        </button>
-      </form>
-
-      <hr>
-      <p class="text-center mb-0 text-muted">
-        ยังไม่มีบัญชีร้านค้า?
-        <a href="/web/register" class="fw-semibold">ลงทะเบียนร้านค้า</a>
-      </p>
+    {% if error %}
+    <div class="alert alert-danger py-2 mb-3">
+      <i class="bi bi-exclamation-circle me-1"></i>{{ error }}
     </div>
+    {% endif %}
+
+    {% if request.query_params.get('registered') %}
+    <div class="alert alert-success py-2 mb-3">
+      <i class="bi bi-check-circle me-1"></i>ลงทะเบียนสำเร็จ กรุณาเข้าสู่ระบบ
+    </div>
+    {% endif %}
+
+    <form method="post" action="/web/login" class="needs-validation" novalidate>
+      <div class="mb-3">
+        <label class="form-label">ชื่อผู้ใช้</label>
+        <input type="text" name="username" class="form-control form-control-lg" required autofocus placeholder="username">
+      </div>
+      <div class="mb-4">
+        <label class="form-label">รหัสผ่าน</label>
+        <input type="password" name="password" class="form-control form-control-lg" required placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg w-100">
+        <i class="bi bi-box-arrow-in-right me-1"></i>เข้าสู่ระบบ
+      </button>
+    </form>
+
+    <hr class="my-3">
+    <p class="text-center mb-0" style="font-size:.875rem;color:var(--sp-slate);">
+      ยังไม่มีบัญชีร้านค้า?
+      <a href="/web/register" class="fw-semibold" style="color:var(--sp-blue-lt);">ลงทะเบียนร้านค้า</a>
+    </p>
   </div>
 </div>
 {% endblock %}
+

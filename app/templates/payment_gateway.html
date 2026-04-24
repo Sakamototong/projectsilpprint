@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SilpPay — Payment Gateway for Modern Businesses</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:      #0B1120;
+      --navy-card: #1a2235;
+      --blue:      #2563EB;
+      --blue-light:#3B82F6;
+      --blue-glow: rgba(37,99,235,.18);
+      --teal:      #06B6D4;
+      --slate:     #94A3B8;
+      --slate-dim: #64748B;
+      --white:     #F8FAFC;
+      --success:   #10B981;
+      --border:    rgba(255,255,255,.07);
+      --radius:    14px;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', sans-serif; background: var(--navy); color: var(--white); -webkit-font-smoothing: antialiased; }
+
+    /* NAV */
+    nav { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(1.5rem,5vw,5rem); height: 64px; background: rgba(11,17,32,.85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); }
+    .nav-logo { display: flex; align-items: center; gap: .55rem; font-weight: 700; font-size: 1.15rem; text-decoration: none; color: var(--white); }
+    .nav-links { display: flex; align-items: center; gap: 2rem; }
+    .nav-links a { color: var(--slate); text-decoration: none; font-size: .875rem; font-weight: 500; transition: color .2s; }
+    .nav-links a:hover { color: var(--white); }
+
+    /* BUTTONS */
+    .btn { display: inline-flex; align-items: center; gap: .45rem; padding: .6rem 1.3rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: all .2s; text-decoration: none; border: none; }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-primary:hover { background: var(--blue-light); transform: translateY(-1px); }
+    .btn-ghost { background: transparent; color: var(--white); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: rgba(255,255,255,.06); }
+    .btn-lg { padding: .85rem 2rem; font-size: 1rem; border-radius: 10px; }
+
+    /* HERO */
+    .hero { position: relative; overflow: hidden; padding: clamp(5rem,12vw,9rem) clamp(1.5rem,5vw,5rem) clamp(4rem,8vw,7rem); text-align: center; }
+    .hero::before { content: ''; position: absolute; top: -220px; left: 50%; transform: translateX(-50%); width: 900px; height: 900px; background: radial-gradient(circle, rgba(37,99,235,.22) 0%, transparent 70%); pointer-events: none; }
+    .hero-badge { display: inline-flex; align-items: center; gap: .45rem; background: rgba(37,99,235,.15); border: 1px solid rgba(37,99,235,.35); color: var(--blue-light); padding: .35rem .9rem; border-radius: 99px; font-size: .8rem; font-weight: 600; letter-spacing: .5px; margin-bottom: 1.6rem; }
+    .hero h1 { font-size: clamp(2.4rem,6vw,4rem); font-weight: 800; line-height: 1.1; letter-spacing: -1.5px; max-width: 800px; margin: 0 auto 1.4rem; }
+    .hero h1 span { background: linear-gradient(135deg, var(--blue-light), var(--teal)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p { font-size: clamp(1rem,2vw,1.15rem); color: var(--slate); max-width: 560px; margin: 0 auto 2.4rem; line-height: 1.7; }
+    .hero-cta { display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; }
+    .hero-stats { display: flex; justify-content: center; gap: clamp(2rem,5vw,4rem); margin-top: 4rem; flex-wrap: wrap; }
+    .hero-stat-num { font-size: 1.7rem; font-weight: 800; }
+    .hero-stat-label { font-size: .8rem; color: var(--slate); margin-top: .15rem; }
+
+    /* SECTIONS */
+    section { padding: clamp(3.5rem,7vw,6rem) clamp(1.5rem,5vw,5rem); }
+    .section-label { font-size: .78rem; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; color: var(--blue-light); margin-bottom: .8rem; }
+    .section-title { font-size: clamp(1.7rem,3.5vw,2.4rem); font-weight: 800; letter-spacing: -.8px; line-height: 1.2; margin-bottom: 1rem; }
+    .section-sub { color: var(--slate); font-size: 1rem; line-height: 1.7; max-width: 520px; }
+    .centered { text-align: center; margin: 0 auto; }
+    .glow-divider { width: 80px; height: 3px; background: linear-gradient(90deg, var(--blue), var(--teal)); border-radius: 99px; margin: 1rem auto 2.5rem; }
+
+    /* INTEGRATION */
+    .integration-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; align-items: start; max-width: 1100px; margin: 0 auto; }
+    @media (max-width: 900px) { .integration-grid { grid-template-columns: 1fr; } .nav-links { display: none; } }
+    .code-tabs { display: flex; gap: .2rem; }
+    .code-tab { padding: .45rem 1rem; font-size: .78rem; font-weight: 600; cursor: pointer; border-radius: 7px 7px 0 0; color: var(--slate); background: transparent; border: 1px solid transparent; border-bottom: none; transition: all .2s; }
+    .code-tab.active { background: var(--navy-card); color: var(--white); border-color: var(--border); }
+    .code-block { background: var(--navy-card); border: 1px solid var(--border); border-radius: 0 var(--radius) var(--radius); padding: 1.6rem; font-family: 'JetBrains Mono', monospace; font-size: .82rem; line-height: 1.75; overflow-x: auto; position: relative; }
+    .copy-btn { position: absolute; top: .8rem; right: .8rem; background: rgba(255,255,255,.07); border: 1px solid var(--border); color: var(--slate); padding: .3rem .7rem; border-radius: 6px; font-size: .72rem; font-family: 'Inter', sans-serif; cursor: pointer; transition: all .2s; }
+    .copy-btn:hover { background: rgba(255,255,255,.13); color: var(--white); }
+    .code-panel { display: none; }
+    .code-panel.active { display: block; }
+    .kw  { color: #7C83FA; } .str { color: #86EFAC; } .fn  { color: #38BDF8; }
+    .cm  { color: #475569; } .num { color: #FB923C; } .var { color: #E2E8F0; } .key { color: #F472B6; }
+    .feature-list { list-style: none; display: flex; flex-direction: column; gap: .9rem; margin-top: 2rem; }
+    .feature-list li { display: flex; align-items: flex-start; gap: .75rem; font-size: .92rem; color: var(--slate); line-height: 1.6; }
+    .feat-icon { flex-shrink: 0; width: 20px; height: 20px; background: rgba(16,185,129,.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+
+    /* PRICING */
+    .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; max-width: 1060px; margin: 3rem auto 0; }
+    @media (max-width: 900px) { .pricing-grid { grid-template-columns: 1fr; } }
+    .pricing-card { background: var(--navy-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 2rem 1.8rem; position: relative; transition: border-color .25s, transform .25s; display: flex; flex-direction: column; }
+    .pricing-card:hover { border-color: rgba(37,99,235,.4); transform: translateY(-4px); }
+    .pricing-card.featured { border-color: var(--blue); background: linear-gradient(160deg, rgba(37,99,235,.12), var(--navy-card)); }
+    .popular-badge { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); background: var(--blue); color: #fff; padding: .3rem .9rem; border-radius: 99px; font-size: .72rem; font-weight: 700; letter-spacing: .5px; white-space: nowrap; }
+    .pricing-name { font-size: .78rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--slate); margin-bottom: .8rem; }
+    .pricing-price { font-size: 2.6rem; font-weight: 800; letter-spacing: -1.5px; line-height: 1; }
+    .pricing-price span { font-size: .95rem; font-weight: 500; color: var(--slate); vertical-align: super; margin-right: 2px; }
+    .pricing-rate { font-size: .82rem; color: var(--slate); margin-top: .4rem; margin-bottom: 1.5rem; }
+    .pricing-divider { border: none; border-top: 1px solid var(--border); margin: 1.2rem 0; }
+    .pricing-features { list-style: none; display: flex; flex-direction: column; gap: .75rem; flex: 1; }
+    .pricing-features li { display: flex; align-items: center; gap: .65rem; font-size: .875rem; color: var(--slate); }
+    .pricing-features li.dim { opacity: .45; }
+    .pricing-cta { margin-top: 1.8rem; }
+
+    /* SECURITY */
+    .security-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.2rem; max-width: 900px; margin: 3rem auto 0; }
+    .security-card { background: var(--navy-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.6rem 1.4rem; display: flex; flex-direction: column; align-items: center; gap: .7rem; text-align: center; transition: border-color .2s; }
+    .security-card:hover { border-color: rgba(37,99,235,.35); }
+    .security-icon { width: 48px; height: 48px; background: rgba(37,99,235,.12); border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+    .security-name { font-size: .9rem; font-weight: 700; }
+    .security-desc { font-size: .77rem; color: var(--slate); line-height: 1.5; }
+
+    /* DOCS BAND */
+    .docs-band { max-width: 1100px; margin: 0 auto; background: linear-gradient(135deg, rgba(37,99,235,.18), rgba(6,182,212,.1)); border: 1px solid rgba(37,99,235,.3); border-radius: 20px; padding: 3rem 2.5rem; display: flex; align-items: center; justify-content: space-between; gap: 2rem; flex-wrap: wrap; }
+    .docs-band h3 { font-size: 1.5rem; font-weight: 800; letter-spacing: -.5px; margin-bottom: .4rem; }
+    .docs-band p { color: var(--slate); font-size: .9rem; line-height: 1.6; max-width: 480px; }
+    .docs-actions { display: flex; gap: .85rem; flex-wrap: wrap; }
+
+    /* TRUST BAR */
+    .trust-bar { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 1.4rem clamp(1.5rem,5vw,5rem); display: flex; align-items: center; justify-content: center; gap: 3rem; flex-wrap: wrap; }
+    .trust-item { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--slate); font-weight: 500; }
+
+    /* FOOTER */
+    footer { padding: 2rem clamp(1.5rem,5vw,5rem); border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+    .footer-text { color: var(--slate-dim); font-size: .8rem; }
+    .footer-links { display: flex; gap: 1.5rem; }
+    .footer-links a { color: var(--slate-dim); font-size: .8rem; text-decoration: none; transition: color .2s; }
+    .footer-links a:hover { color: var(--white); }
+    .copied { background: rgba(16,185,129,.2) !important; color: #10B981 !important; }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <rect width="28" height="28" rx="8" fill="#2563EB"/>
+      <path d="M7 10h14M7 14h9M7 18h11" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    SilpPay
+  </a>
+  <div class="nav-links">
+    <a href="#integration">Integration</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#security">Security</a>
+    <a href="#docs">Docs</a>
+  </div>
+  <div style="display:flex;gap:.75rem;">
+    <a href="#" class="btn btn-ghost">Sign In</a>
+    <a href="#" class="btn btn-primary">Get Started Free</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">
+    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><circle cx="4" cy="4" r="4"/></svg>
+    Now live — v2.4 with instant settlement
+  </div>
+  <h1>Accept payments<br><span>without the complexity</span></h1>
+  <p>A developer-first payment gateway with sub-200ms latency, 99.99% uptime, and one-line integration. Go live in minutes, not months.</p>
+  <div class="hero-cta">
+    <a href="#" class="btn btn-primary btn-lg">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      Start for Free
+    </a>
+    <a href="#integration" class="btn btn-ghost btn-lg">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      View Integration
+    </a>
+  </div>
+  <div class="hero-stats">
+    <div><div class="hero-stat-num">$12B+</div><div class="hero-stat-label">Processed annually</div></div>
+    <div><div class="hero-stat-num">180ms</div><div class="hero-stat-label">Avg. API latency</div></div>
+    <div><div class="hero-stat-num">99.99%</div><div class="hero-stat-label">Uptime SLA</div></div>
+    <div><div class="hero-stat-num">40k+</div><div class="hero-stat-label">Active businesses</div></div>
+  </div>
+</section>
+
+<!-- TRUST BAR -->
+<div class="trust-bar">
+  <div class="trust-item">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    PCI DSS Level 1
+  </div>
+  <div class="trust-item">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    SOC 2 Type II
+  </div>
+  <div class="trust-item">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    3DS2 Ready
+  </div>
+  <div class="trust-item">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    256-bit TLS
+  </div>
+  <div class="trust-item">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    GDPR Compliant
+  </div>
+</div>
+
+<!-- INTEGRATION -->
+<section id="integration">
+  <div style="text-align:center;margin-bottom:1rem;">
+    <div class="section-label">Integration</div>
+    <h2 class="section-title centered">One API, every payment method</h2>
+    <div class="glow-divider"></div>
+  </div>
+  <div class="integration-grid">
+    <div>
+      <p class="section-sub">Drop in our SDK or use the REST API directly. Accept cards, digital wallets, bank transfers, and local methods from one unified endpoint.</p>
+      <ul class="feature-list">
+        <li>
+          <span class="feat-icon"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="10 3 5 8 2 5"/></svg></span>
+          <span>Idempotent requests — safe to retry on network failure</span>
+        </li>
+        <li>
+          <span class="feat-icon"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="10 3 5 8 2 5"/></svg></span>
+          <span>Webhook signatures for tamper-proof event delivery</span>
+        </li>
+        <li>
+          <span class="feat-icon"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="10 3 5 8 2 5"/></svg></span>
+          <span>Built-in 3D Secure 2 authentication flow</span>
+        </li>
+        <li>
+          <span class="feat-icon"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="10 3 5 8 2 5"/></svg></span>
+          <span>SDKs for Python, Node.js, PHP, Go, Ruby, Java</span>
+        </li>
+        <li>
+          <span class="feat-icon"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="10 3 5 8 2 5"/></svg></span>
+          <span>Sandbox environment included in every free account</span>
+        </li>
+      </ul>
+    </div>
+    <div>
+      <div class="code-tabs">
+        <button class="code-tab active" onclick="switchTab('python',this)">Python</button>
+        <button class="code-tab" onclick="switchTab('node',this)">Node.js</button>
+        <button class="code-tab" onclick="switchTab('curl',this)">cURL</button>
+      </div>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+
+        <div id="code-python" class="code-panel active">
+<span class="kw">import</span> <span class="var">silppay</span>
+
+<span class="var">client</span> <span class="kw">=</span> <span class="fn">silppay.Client</span>(<span class="str">"sk_live_••••••••"</span>)
+
+<span class="cm"># Create a payment intent</span>
+<span class="var">intent</span> <span class="kw">=</span> <span class="var">client</span>.<span class="fn">payment_intents.create</span>(
+    <span class="key">amount</span><span class="kw">=</span><span class="num">4900</span>,        <span class="cm"># satang</span>
+    <span class="key">currency</span><span class="kw">=</span><span class="str">"thb"</span>,
+    <span class="key">payment_method</span><span class="kw">=</span><span class="str">"pm_card_visa"</span>,
+    <span class="key">confirm</span><span class="kw">=</span><span class="kw">True</span>,
+    <span class="key">metadata</span><span class="kw">=</span>{<span class="str">"order_id"</span>: <span class="str">"ord_8821"</span>},
+)
+
+<span class="fn">print</span>(<span class="var">intent</span>.<span class="var">status</span>)  <span class="cm"># "succeeded"</span>
+        </div>
+
+        <div id="code-node" class="code-panel">
+<span class="kw">const</span> <span class="var">SilpPay</span> <span class="kw">=</span> <span class="fn">require</span>(<span class="str">'silppay'</span>);
+<span class="kw">const</span> <span class="var">client</span> <span class="kw">=</span> <span class="kw">new</span> <span class="fn">SilpPay</span>(<span class="str">'sk_live_••••••••'</span>);
+
+<span class="cm">// Create a payment intent</span>
+<span class="kw">const</span> <span class="var">intent</span> <span class="kw">=</span> <span class="kw">await</span> <span class="var">client</span>.<span class="var">paymentIntents</span>.<span class="fn">create</span>({
+  <span class="key">amount</span>: <span class="num">4900</span>,
+  <span class="key">currency</span>: <span class="str">'thb'</span>,
+  <span class="key">paymentMethod</span>: <span class="str">'pm_card_visa'</span>,
+  <span class="key">confirm</span>: <span class="kw">true</span>,
+  <span class="key">metadata</span>: { <span class="key">orderId</span>: <span class="str">'ord_8821'</span> },
+});
+
+<span class="var">console</span>.<span class="fn">log</span>(<span class="var">intent</span>.<span class="var">status</span>); <span class="cm">// "succeeded"</span>
+        </div>
+
+        <div id="code-curl" class="code-panel">
+<span class="fn">curl</span> <span class="kw">-X</span> POST <span class="str">https://api.silppay.io/v1/payment_intents</span> \
+  <span class="kw">-H</span> <span class="str">"Authorization: Bearer sk_live_••••••••"</span> \
+  <span class="kw">-H</span> <span class="str">"Content-Type: application/json"</span> \
+  <span class="kw">-d</span> <span class="str">'{
+    "amount": 4900,
+    "currency": "thb",
+    "payment_method": "pm_card_visa",
+    "confirm": true,
+    "metadata": { "order_id": "ord_8821" }
+  }'</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing" style="background:linear-gradient(180deg,transparent,rgba(37,99,235,.04),transparent)">
+  <div class="section-label centered">Pricing</div>
+  <h2 class="section-title centered">Simple, transparent rates</h2>
+  <p class="section-sub centered">No hidden fees. No setup costs. Pay only when you earn.</p>
+  <div class="glow-divider"></div>
+
+  <div class="pricing-grid">
+    <!-- Starter -->
+    <div class="pricing-card">
+      <div class="pricing-name">Starter</div>
+      <div class="pricing-price"><span>&#3647;</span>0</div>
+      <div class="pricing-rate">+ 2.9% + &#3647;3 per transaction</div>
+      <hr class="pricing-divider"/>
+      <ul class="pricing-features">
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          5,000 transactions/mo
+        </li>
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Cards + PromptPay
+        </li>
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Sandbox access
+        </li>
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Email support
+        </li>
+        <li class="dim">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          Custom settlement
+        </li>
+        <li class="dim">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          Dedicated manager
+        </li>
+      </ul>
+      <div class="pricing-cta"><a href="#" class="btn btn-ghost" style="width:100%;justify-content:center;">Get Started Free</a></div>
+    </div>
+
+    <!-- Growth (featured) -->
+    <div class="pricing-card featured">
+      <div class="popular-badge">MOST POPULAR</div>
+      <div class="pricing-name">Growth</div>
+      <div class="pricing-price"><span>&#3647;</span>1,490</div>
+      <div class="pricing-rate">+ 1.9% + &#3647;2 per transaction / month</div>
+      <hr class="pricing-divider"/>
+      <ul class="pricing-features">
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          50,000 transactions/mo
+        </li>
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          All payment methods
+        </li>
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          D+1 settlement
+        </li>
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Webhooks + retry logic
+        </li>
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Priority chat support
+        </li>
+        <li class="dim">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          Dedicated manager
+        </li>
+      </ul>
+      <div class="pricing-cta"><a href="#" class="btn btn-primary" style="width:100%;justify-content:center;">Start 14-day Trial</a></div>
+    </div>
+
+    <!-- Enterprise -->
+    <div class="pricing-card">
+      <div class="pricing-name">Enterprise</div>
+      <div class="pricing-price" style="font-size:2rem;">Custom</div>
+      <div class="pricing-rate">Volume discounts from 0.8%</div>
+      <hr class="pricing-divider"/>
+      <ul class="pricing-features">
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Unlimited transactions
+        </li>
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Same-day settlement
+        </li>
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Custom payment flows
+        </li>
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          99.99% SLA contract
+        </li>
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Dedicated account manager
+        </li>
+        <li>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          On-prem deployment option
+        </li>
+      </ul>
+      <div class="pricing-cta"><a href="#" class="btn btn-ghost" style="width:100%;justify-content:center;">Contact Sales</a></div>
+    </div>
+  </div>
+</section>
+
+<!-- SECURITY -->
+<section id="security">
+  <div class="section-label centered">Security &amp; Compliance</div>
+  <h2 class="section-title centered">Enterprise-grade protection</h2>
+  <p class="section-sub centered">Your customers' data and funds are protected by the highest industry standards.</p>
+  <div class="glow-divider"></div>
+  <div class="security-grid">
+    <div class="security-card">
+      <div class="security-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div class="security-name">PCI DSS Level 1</div>
+      <div class="security-desc">Highest certification for cardholder data security. Audited annually by a QSA.</div>
+    </div>
+    <div class="security-card">
+      <div class="security-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div class="security-name">256-bit TLS</div>
+      <div class="security-desc">All data in transit encrypted with TLS 1.3. Card tokens never touch your servers.</div>
+    </div>
+    <div class="security-card">
+      <div class="security-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="security-name">SOC 2 Type II</div>
+      <div class="security-desc">Independently verified controls for security, availability, and confidentiality.</div>
+    </div>
+    <div class="security-card">
+      <div class="security-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+      </div>
+      <div class="security-name">3DS2 Authentication</div>
+      <div class="security-desc">Friction-right 3D Secure 2 reduces fraud while maintaining high conversion.</div>
+    </div>
+    <div class="security-card">
+      <div class="security-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      </div>
+      <div class="security-name">GDPR Compliant</div>
+      <div class="security-desc">Full GDPR compliance with data residency options in EU and APAC regions.</div>
+    </div>
+    <div class="security-card">
+      <div class="security-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <div class="security-name">Real-time Fraud ML</div>
+      <div class="security-desc">ML models score every transaction in under 50ms with 99.6% accuracy.</div>
+    </div>
+  </div>
+</section>
+
+<!-- DEVELOPER DOCS -->
+<section id="docs">
+  <div class="docs-band">
+    <div>
+      <div class="section-label" style="text-align:left;">Developer Docs</div>
+      <h3>Everything you need to integrate fast</h3>
+      <p>Full API reference, SDKs, Postman collection, interactive sandbox, code recipes, and migration guides — all in one place.</p>
+    </div>
+    <div class="docs-actions">
+      <a href="#" class="btn btn-primary btn-lg">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Read the Docs
+      </a>
+      <a href="#" class="btn btn-ghost btn-lg">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+        Watch Quickstart
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-text">&#169; 2026 SilpPay. All rights reserved.</div>
+  <div class="footer-links">
+    <a href="#">Privacy</a>
+    <a href="#">Terms</a>
+    <a href="#">Status</a>
+    <a href="#">Contact</a>
+  </div>
+</footer>
+
+<script>
+  function switchTab(lang, btn) {
+    document.querySelectorAll('.code-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.code-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('code-' + lang).classList.add('active');
+  }
+
+  function copyCode(btn) {
+    const panel = btn.closest('.code-block').querySelector('.code-panel.active');
+    navigator.clipboard.writeText(panel.innerText).then(() => {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+</script>
+</body>
+</html>

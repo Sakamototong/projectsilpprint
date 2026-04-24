@@ -1,103 +1,126 @@
 {% extends "base.html" %}
 {% block title %}ลงทะเบียนร้านค้า – SilpPrint{% endblock %}
+{% block head %}
+<style>
+  body { display: flex; flex-direction: column; min-height: 100vh; }
+  .container-fluid.px-4.py-4 { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding-top: 2.5rem !important; }
+  .reg-wrap { width: 100%; max-width: 640px; }
+  .section-sep { font-size: .72rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--sp-blue-lt); margin-bottom: .75rem; margin-top: .25rem; }
+  .plan-card { border: 1px solid var(--sp-border); border-radius: 10px; padding: 1rem; cursor: pointer; transition: border-color .2s, background .2s; }
+  .plan-card:has(input:checked) { border-color: var(--sp-blue); background: rgba(37,99,235,.1); }
+  .form-check-input { background-color: transparent; border-color: var(--sp-slate-dim); }
+  .form-check-input:checked { background-color: var(--sp-blue); border-color: var(--sp-blue); }
+</style>
+{% endblock %}
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-sm-10 col-md-8 col-lg-6">
-    <div class="card p-4">
-      <h5 class="card-title mb-4 fw-bold">
-        <i class="bi bi-shop text-primary me-2"></i>ลงทะเบียนร้านค้าใหม่
-      </h5>
+<div class="reg-wrap">
 
-      {% if error %}
-      <div class="alert alert-danger py-2"><i class="bi bi-exclamation-circle me-1"></i>{{ error }}</div>
+  <div class="text-center mb-4">
+    <div style="display:inline-flex;align-items:center;justify-content:center;width:52px;height:52px;background:var(--sp-blue);border-radius:13px;margin-bottom:1rem;">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M7 10h14M7 14h9M7 18h11" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+    </div>
+    <h4 class="fw-bold mb-1" style="letter-spacing:-.5px;">ลงทะเบียนร้านค้าใหม่</h4>
+    <p style="color:var(--sp-slate);font-size:.875rem;">สร้างบัญชีร้านค้าฟรี เริ่มใช้งานได้ทันที</p>
+  </div>
+
+  <div class="card p-4">
+    <div style="height:3px;background:linear-gradient(90deg,var(--sp-blue),var(--sp-teal));border-radius:99px;margin-bottom:1.5rem;"></div>
+
+    {% if error %}
+    <div class="alert alert-danger py-2 mb-3">
+      <i class="bi bi-exclamation-circle me-1"></i>{{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/web/register" class="needs-validation" novalidate>
+
+      <div class="section-sep"><i class="bi bi-info-circle me-1"></i>ข้อมูลพื้นฐาน</div>
+
+      <div class="mb-3">
+        <label class="form-label">ชื่อร้านค้า <span class="text-danger">*</span></label>
+        <input type="text" name="store_name" class="form-control" required autofocus
+               placeholder="เช่น ปั๊มน้ำมัน ABC สาขา 1">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">ชื่อผู้ใช้ <span class="text-danger">*</span></label>
+        <input type="text" name="username" class="form-control" required
+               placeholder="ตัวอักษรและตัวเลข ไม่มีช่องว่าง" pattern="[a-zA-Z0-9_]+">
+        <div class="form-text">ใช้สำหรับเข้าสู่ระบบ เปลี่ยนภายหลังไม่ได้</div>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col">
+          <label class="form-label">รหัสผ่าน <span class="text-danger">*</span></label>
+          <input type="password" name="password" id="pw" class="form-control" required minlength="8" placeholder="อย่างน้อย 8 ตัว">
+        </div>
+        <div class="col">
+          <label class="form-label">ยืนยันรหัสผ่าน <span class="text-danger">*</span></label>
+          <input type="password" name="password_confirm" id="pw2" class="form-control" required minlength="8" placeholder="พิมพ์ซ้ำ">
+        </div>
+      </div>
+
+      <hr class="my-3">
+      <div class="section-sep"><i class="bi bi-telephone me-1"></i>ข้อมูลติดต่อ</div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">เบอร์โทรศัพท์</label>
+          <input type="tel" name="phone" class="form-control" placeholder="0xx-xxx-xxxx">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">อีเมล</label>
+          <input type="email" name="email" class="form-control" placeholder="example@mail.com">
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">ที่อยู่ร้านค้า</label>
+        <textarea name="address" class="form-control" rows="2" placeholder="ที่อยู่สำหรับออกใบเสร็จ"></textarea>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">เลขประจำตัวผู้เสียภาษี (Tax ID)</label>
+          <input type="text" name="tax_id" class="form-control" placeholder="13 หลัก">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">ประเภทธุรกิจ</label>
+          <select name="business_type" class="form-select">
+            <option value="">-- เลือกประเภท --</option>
+            <option value="fuel_station">ปั๊มน้ำมัน</option>
+            <option value="retail">ร้านค้าปลีก</option>
+            <option value="other">อื่น ๆ</option>
+          </select>
+        </div>
+      </div>
+
+      {% if plans %}
+      <hr class="my-3">
+      <div class="section-sep"><i class="bi bi-credit-card me-1"></i>แผนที่สนใจ (ไม่บังคับ — เริ่มต้นฟรีทุกร้าน)</div>
+      <div class="row g-2 mb-3">
+        {% for p in plans %}
+        <div class="col-md-6">
+          <label class="plan-card d-block">
+            <div class="d-flex align-items-start gap-2">
+              <input class="form-check-input mt-1" type="radio" name="requested_plan_id" id="plan{{ p.id }}" value="{{ p.id }}">
+              <div>
+                <div class="fw-semibold" style="color:var(--sp-white);">{{ p.name }}</div>
+                <div style="color:var(--sp-blue-lt);font-size:.82rem;font-weight:600;">฿{{ "%.0f"|format(p.price_monthly) }}/เดือน</div>
+                {% if p.description %}<div style="color:var(--sp-slate);font-size:.78rem;">{{ p.description }}</div>{% endif %}
+              </div>
+            </div>
+          </label>
+        </div>
+        {% endfor %}
+      </div>
       {% endif %}
 
-      <form method="post" action="/web/register" class="needs-validation" novalidate>
-        <p class="fw-semibold text-muted small mb-2">ข้อมูลพื้นฐาน</p>
-        <div class="mb-3">
-          <label class="form-label fw-semibold">ชื่อร้านค้า <span class="text-danger">*</span></label>
-          <input type="text" name="store_name" class="form-control" required autofocus
-                 placeholder="เช่น ปั๊มน้ำมัน ABC สาขา 1">
-        </div>
-        <div class="mb-3">
-          <label class="form-label fw-semibold">ชื่อผู้ใช้ <span class="text-danger">*</span></label>
-          <input type="text" name="username" class="form-control" required
-                 placeholder="ตัวอักษรและตัวเลข ไม่มีช่องว่าง" pattern="[a-zA-Z0-9_]+">
-          <div class="form-text">ใช้สำหรับเข้าสู่ระบบ เปลี่ยนภายหลังไม่ได้</div>
-        </div>
-        <div class="row g-2 mb-3">
-          <div class="col">
-            <label class="form-label fw-semibold">รหัสผ่าน <span class="text-danger">*</span></label>
-            <input type="password" name="password" id="pw" class="form-control" required minlength="8" placeholder="อย่างน้อย 8 ตัว">
-          </div>
-          <div class="col">
-            <label class="form-label fw-semibold">ยืนยันรหัสผ่าน <span class="text-danger">*</span></label>
-            <input type="password" name="password_confirm" id="pw2" class="form-control" required minlength="8" placeholder="พิมพ์ซ้ำ">
-          </div>
-        </div>
+      <button type="submit" class="btn btn-primary btn-lg w-100 mt-2">
+        <i class="bi bi-check-circle me-1"></i>ลงทะเบียน
+      </button>
+    </form>
 
-        <hr class="my-3">
-        <p class="fw-semibold text-muted small mb-2">ข้อมูลติดต่อ</p>
-        <div class="row g-2 mb-3">
-          <div class="col-md-6">
-            <label class="form-label fw-semibold">เบอร์โทรศัพท์</label>
-            <input type="tel" name="phone" class="form-control" placeholder="0xx-xxx-xxxx">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label fw-semibold">อีเมล</label>
-            <input type="email" name="email" class="form-control" placeholder="example@mail.com">
-          </div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label fw-semibold">ที่อยู่ร้านค้า</label>
-          <textarea name="address" class="form-control" rows="2" placeholder="ที่อยู่สำหรับออกใบเสร็จ"></textarea>
-        </div>
-        <div class="row g-2 mb-3">
-          <div class="col-md-6">
-            <label class="form-label fw-semibold">เลขประจำตัวผู้เสียภาษี (Tax ID)</label>
-            <input type="text" name="tax_id" class="form-control" placeholder="13 หลัก">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label fw-semibold">ประเภทธุรกิจ</label>
-            <select name="business_type" class="form-select">
-              <option value="">-- เลือกประเภท --</option>
-              <option value="fuel_station">ปั๊มน้ำมัน</option>
-              <option value="retail">ร้านค้าปลีก</option>
-              <option value="other">อื่น ๆ</option>
-            </select>
-          </div>
-        </div>
-
-        {% if plans %}
-        <hr class="my-3">
-        <p class="fw-semibold text-muted small mb-2">แผนที่สนใจ (ไม่บังคับ — เริ่มต้นฟรีทุกร้าน)</p>
-        <div class="row g-2 mb-3">
-          {% for p in plans %}
-          <div class="col-md-6">
-            <div class="form-check border rounded p-3">
-              <input class="form-check-input" type="radio" name="requested_plan_id" id="plan{{ p.id }}"
-                     value="{{ p.id }}">
-              <label class="form-check-label fw-semibold" for="plan{{ p.id }}">
-                {{ p.name }}
-                <span class="text-muted fw-normal small d-block">฿{{ "%.0f"|format(p.price_monthly) }}/เดือน</span>
-                {% if p.description %}<span class="text-muted small d-block">{{ p.description }}</span>{% endif %}
-              </label>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-        {% endif %}
-
-        <button type="submit" class="btn btn-success btn-lg w-100 mt-2">
-          <i class="bi bi-check-circle me-1"></i>ลงทะเบียน
-        </button>
-      </form>
-
-      <hr>
-      <p class="text-center mb-0 text-muted">
-        มีบัญชีแล้ว? <a href="/web/login" class="fw-semibold">เข้าสู่ระบบ</a>
-      </p>
-    </div>
+    <hr class="my-3">
+    <p class="text-center mb-0" style="font-size:.875rem;color:var(--sp-slate);">
+      มีบัญชีแล้ว? <a href="/web/login" class="fw-semibold" style="color:var(--sp-blue-lt);">เข้าสู่ระบบ</a>
+    </p>
   </div>
 </div>
 <script>
@@ -108,3 +131,4 @@
   });
 </script>
 {% endblock %}
+

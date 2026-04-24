@@ -218,23 +218,20 @@
   <div class="collapse mb-3" id="addAddressForm">
     <div class="card border-primary p-3">
       <h6 class="fw-bold text-primary mb-3 small">เพิ่มที่อยู่ใหม่</h6>
-      <form method="post" action="/web/members/{{ member.id }}/billing-profiles">
+      <form method="post" action="/web/members/{{ member.id }}/billing-profiles" id="md-add-form">
+        <input type="hidden" name="label" id="md-add-label">
         <div class="row g-2">
-          <div class="col-md-6">
-            <label class="form-label form-label-sm">ชื่อที่อยู่ / ป้ายกำกับ <span class="text-danger">*</span></label>
-            <input type="text" name="label" class="form-control form-control-sm" placeholder="เช่น สำนักงานใหญ่" required>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label form-label-sm">ชื่อบริษัท / ผู้รับใบกำกับ</label>
-            <input type="text" name="company_name" class="form-control form-control-sm" placeholder="ชื่อบริษัท / บุคคล">
+          <div class="col-12">
+            <label class="form-label form-label-sm">ชื่อบริษัท / ผู้รับใบกำกับ <span class="text-danger">*</span></label>
+            <input type="text" name="company_name" id="md-add-company" class="form-control form-control-sm" placeholder="บริษัท / ร้านค้า / ชื่อบุคคล" required>
           </div>
           <div class="col-md-6">
             <label class="form-label form-label-sm">เลขผู้เสียภาษี</label>
-            <input type="text" name="tax_id" class="form-control form-control-sm" placeholder="13 หลัก">
+            <input type="text" name="tax_id" id="md-add-tax" class="form-control form-control-sm" placeholder="X-XXXX-XXXXX-XX-X" maxlength="17" inputmode="numeric">
           </div>
           <div class="col-md-6">
             <label class="form-label form-label-sm">เบอร์โทร</label>
-            <input type="text" name="phone" class="form-control form-control-sm" placeholder="0xx-xxx-xxxx">
+            <input type="text" name="phone" id="md-add-phone" class="form-control form-control-sm" placeholder="XXX-XXX-XXXX" maxlength="12" inputmode="numeric">
           </div>
           <div class="col-12">
             <label class="form-label form-label-sm">ที่อยู่</label>
@@ -270,15 +267,21 @@
       <div class="card h-100 border{% if bp.is_default %}-primary{% endif %}">
         <div class="card-body py-3 px-3">
           <div class="d-flex justify-content-between align-items-start mb-1">
-            <span class="fw-bold small">{{ bp.label }}
+            <span class="fw-bold small">{{ bp.company_name or bp.label }}
               {% if bp.is_default %}<span class="badge bg-primary ms-1" style="font-size:.65rem;">หลัก</span>{% endif %}
             </span>
-            <form method="post" action="/web/members/{{ member.id }}/billing-profiles/{{ bp.id }}/delete"
-                  onsubmit="return confirm('ลบที่อยู่ {{ bp.label }} ใช่หรือไม่?')" class="ms-2">
-              <button class="btn btn-outline-danger btn-sm py-0 px-1" style="font-size:.75rem;">
-                <i class="bi bi-trash"></i>
+            <div class="d-flex gap-1 ms-2">
+              <button class="btn btn-outline-primary btn-sm py-0 px-1" style="font-size:.75rem;"
+                onclick='mdOpenEdit({{ {"id":bp.id,"company_name":bp.company_name or bp.label,"tax_id":bp.tax_id or "","address":bp.address or "","phone":bp.phone or "","email":bp.email or "","is_default":bp.is_default}|tojson }})'>
+                <i class="bi bi-pencil-square"></i>
               </button>
-            </form>
+              <form method="post" action="/web/members/{{ member.id }}/billing-profiles/{{ bp.id }}/delete"
+                    onsubmit="return confirm('ลบที่อยู่ {{ bp.company_name or bp.label }} ใช่หรือไม่?')">
+                <button class="btn btn-outline-danger btn-sm py-0 px-1" style="font-size:.75rem;">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
           </div>
           {% if bp.company_name %}<p class="mb-1 small fw-semibold">{{ bp.company_name }}</p>{% endif %}
           {% if bp.tax_id %}<p class="mb-1 small text-muted">เลขภาษี: {{ bp.tax_id }}</p>{% endif %}
@@ -296,6 +299,120 @@
   </div>
   {% endif %}
 </div>
+
+{# ── Edit Billing Profile Modal ── #}
+<div class="modal fade" id="mdEditBpModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-3">
+        <h6 class="modal-title fw-bold">
+          <i class="bi bi-pencil-square me-2 text-primary"></i>แก้ไขที่อยู่
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" id="md-edit-form" action="#">
+        <input type="hidden" name="label" id="md-edit-label">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small fw-bold">ชื่อบริษัท / ผู้รับใบกำกับ <span class="text-danger">*</span></label>
+            <input type="text" name="company_name" id="md-edit-company" class="form-control form-control-sm" required>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label small fw-bold">เลขผู้เสียภาษี</label>
+              <input type="text" name="tax_id" id="md-edit-tax" class="form-control form-control-sm"
+                     placeholder="X-XXXX-XXXXX-XX-X" maxlength="17" inputmode="numeric">
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-bold">เบอร์โทร</label>
+              <input type="text" name="phone" id="md-edit-phone" class="form-control form-control-sm"
+                     placeholder="XXX-XXX-XXXX" maxlength="12" inputmode="numeric">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold">ที่อยู่</label>
+            <textarea name="address" id="md-edit-address" class="form-control form-control-sm" rows="3"
+                      placeholder="บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์"></textarea>
+          </div>
+          <div class="row g-2">
+            <div class="col-7">
+              <label class="form-label small fw-bold">อีเมล</label>
+              <input type="email" name="email" id="md-edit-email" class="form-control form-control-sm" placeholder="email@example.com">
+            </div>
+            <div class="col-5 d-flex align-items-end pb-1">
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input" name="is_default" value="1" id="md-edit-is-default">
+                <label class="form-check-label small" for="md-edit-is-default">ตั้งเป็นที่อยู่หลัก</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-save me-1"></i>บันทึกการแก้ไข
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  function fmtTax(v) {
+    var d = v.replace(/\D/g,'').slice(0,13), r='';
+    if(d.length>0)  r+=d.slice(0,1);
+    if(d.length>1)  r+='-'+d.slice(1,5);
+    if(d.length>5)  r+='-'+d.slice(5,10);
+    if(d.length>10) r+='-'+d.slice(10,12);
+    if(d.length>12) r+='-'+d.slice(12,13);
+    return r;
+  }
+  function fmtPhone(v) {
+    var d=v.replace(/\D/g,'').slice(0,10), r='';
+    if(d.length>0) r+=d.slice(0,3);
+    if(d.length>3) r+='-'+d.slice(3,6);
+    if(d.length>6) r+='-'+d.slice(6,10);
+    return r;
+  }
+  ['md-add-tax','md-edit-tax'].forEach(function(id) {
+    document.getElementById(id).addEventListener('input', function(){ this.value=fmtTax(this.value); });
+  });
+  ['md-add-phone','md-edit-phone'].forEach(function(id) {
+    document.getElementById(id).addEventListener('input', function(){ this.value=fmtPhone(this.value); });
+  });
+
+  // add form: sync label
+  var addCompany = document.getElementById('md-add-company');
+  var addForm    = document.getElementById('md-add-form');
+  addCompany.addEventListener('input', function(){ document.getElementById('md-add-label').value=this.value; });
+  addForm.addEventListener('submit', function(){ document.getElementById('md-add-label').value=addCompany.value; });
+
+  // edit modal — lazy init so Bootstrap is guaranteed loaded on first click
+  window.mdOpenEdit = function(data) {
+    var memberId = {{ member.id }};
+    var modalEl = document.getElementById('mdEditBpModal');
+    var _modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    document.getElementById('md-edit-form').action =
+      '/web/members/'+memberId+'/billing-profiles/'+data.id+'/edit';
+    document.getElementById('md-edit-company').value       = data.company_name||'';
+    document.getElementById('md-edit-label').value         = data.company_name||'';
+    document.getElementById('md-edit-tax').value           = data.tax_id||'';
+    document.getElementById('md-edit-phone').value         = data.phone||'';
+    document.getElementById('md-edit-address').value       = data.address||'';
+    document.getElementById('md-edit-email').value         = data.email||'';
+    document.getElementById('md-edit-is-default').checked  = !!data.is_default;
+    _modal.show();
+  };
+  document.getElementById('md-edit-company').addEventListener('input', function(){
+    document.getElementById('md-edit-label').value=this.value;
+  });
+  document.getElementById('md-edit-form').addEventListener('submit', function(){
+    document.getElementById('md-edit-label').value=document.getElementById('md-edit-company').value;
+  });
+})();
+</script>
 
 {# ── Delete member modal ── #}
 <div class="modal fade" id="deleteModal" tabindex="-1">
