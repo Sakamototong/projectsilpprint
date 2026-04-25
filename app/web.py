@@ -730,6 +730,13 @@ def receipt_edit_page(request: Request, receipt_id: int, db: Session = Depends(g
             return RedirectResponse("/web/members", status_code=302)
     payload = receipt.raw_payload or {}
     billing_profiles = db.query(BillingProfile).filter(BillingProfile.member_id == tx.member_id).all() if tx else []
+    bp_raw = payload.get("billing_profile")
+    # Detect if the saved billing profile has been deleted (label no longer matches any active profile)
+    bp_orphaned = False
+    if bp_raw and bp_raw.get("label"):
+        active_labels = {bp.label for bp in billing_profiles}
+        if bp_raw["label"] not in active_labels:
+            bp_orphaned = True
     products = _get_products(db, store.id)
     return templates.TemplateResponse(request, "receipt_edit.html", {
         "store_name": store.name,
@@ -738,6 +745,7 @@ def receipt_edit_page(request: Request, receipt_id: int, db: Session = Depends(g
         "member": member,
         "payload": payload,
         "billing_profiles": billing_profiles,
+        "bp_orphaned": bp_orphaned,
         "products": products,
         "user_role": role,
     })
@@ -795,7 +803,11 @@ def receipt_edit_post(
     points_earned = MemberService.points_for_amount(total)
 
     bp = None
-    if billing_profile_id:
+    kept_bp_snapshot = None
+    if billing_profile_id == "__keep__":
+        # Re-use the billing profile snapshot already stored in the receipt (profile was deleted)
+        kept_bp_snapshot = (receipt.raw_payload or {}).get("billing_profile")
+    elif billing_profile_id:
         try:
             bp = db.query(BillingProfile).filter(
                 BillingProfile.id == int(billing_profile_id),
@@ -816,13 +828,15 @@ def receipt_edit_post(
         "vat_rate": vat_rate, "vat_type": vat_type, "total": total,
         "payment_method": payment_method, "note": note,
         "points_earned": points_earned,
-        "billing_profile": {
-            "company_name": bp.company_name if bp else None,
-            "tax_id": bp.tax_id if bp else None,
-            "address": bp.address if bp else None,
-            "phone": bp.phone if bp else None,
-            "label": bp.label if bp else None,
-        } if bp else None,
+        "billing_profile": kept_bp_snapshot if kept_bp_snapshot else (
+            {
+                "company_name": bp.company_name if bp else None,
+                "tax_id": bp.tax_id if bp else None,
+                "address": bp.address if bp else None,
+                "phone": bp.phone if bp else None,
+                "label": bp.label if bp else None,
+            } if bp else None
+        ),
     }
 
     # บันทึก edit log
