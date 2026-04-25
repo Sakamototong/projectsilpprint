@@ -61,7 +61,7 @@
             {% for bp in billing_profiles %}
             <option value="{{ bp.id }}"
               {% if not bp_orphaned and bp_raw and bp_raw.get('label') == bp.label %}selected{% endif %}>
-              {{ bp.label }}{% if bp.company_name %}  {{ bp.company_name }}{% endif %}
+              {{ bp.label }}{% if bp.company_name and bp.company_name != bp.label %}  {{ bp.company_name }}{% endif %}
             </option>
             {% endfor %}
           </select>

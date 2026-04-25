@@ -67,7 +67,7 @@
             <option value=""> ออกในนามส่วนตัว (ใช้ชื่อสมาชิก) </option>
             {% for bp in billing_profiles %}
             <option value="{{ bp.id }}" {% if bp.is_default %}selected{% endif %}>
-              {{ bp.label }}{% if bp.company_name %}  {{ bp.company_name }}{% endif %}
+              {{ bp.label }}{% if bp.company_name and bp.company_name != bp.label %}  {{ bp.company_name }}{% endif %}
             </option>
             {% endfor %}
           </select>
