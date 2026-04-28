@@ -102,7 +102,7 @@
               <input class="form-check-input mt-1" type="radio" name="requested_plan_id" id="plan{{ p.id }}" value="{{ p.id }}">
               <div>
                 <div class="fw-semibold" style="color:var(--sp-white);">{{ p.name }}</div>
-                <div style="color:var(--sp-blue-lt);font-size:.82rem;font-weight:600;">฿{{ "%.0f"|format(p.price_monthly) }}/เดือน</div>
+                <div style="color:var(--sp-blue-lt);font-size:.82rem;font-weight:600;">฿{{ p.price_monthly|fmt0 }}/เดือน</div>
                 {% if p.description %}<div style="color:var(--sp-slate);font-size:.78rem;">{{ p.description }}</div>{% endif %}
               </div>
             </div>

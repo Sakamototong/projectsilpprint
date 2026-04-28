@@ -18,6 +18,14 @@ from .services.member_service import MemberService
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
+# ── Number format filters (comma thousand separator) ──
+def _fmt(v, d=2):
+    try: return f"{float(v):,.{d}f}"
+    except (TypeError, ValueError): return "0." + "0"*d
+templates.env.filters["fmt"]  = lambda v: _fmt(v, 2)
+templates.env.filters["fmt0"] = lambda v: _fmt(v, 0)
+templates.env.filters["fmt1"] = lambda v: _fmt(v, 1)
+
 router = APIRouter()
 
 
@@ -375,6 +383,9 @@ def members_page(
             Member.name.ilike(f"%{q}%")
             | Member.phone.ilike(f"%{q}%")
             | Member.member_code.ilike(f"%{q}%")
+            | Member.company_name.ilike(f"%{q}%")
+            | Member.license_plate.ilike(f"%{q}%")
+            | Member.driver_name.ilike(f"%{q}%")
         )
     total = query.count()
     total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
@@ -420,6 +431,9 @@ def enroll_post(
     member_code: str = Form(None),
     birthdate: str = Form(None),
     tier: str = Form("general"),
+    company_name: str = Form(None),
+    driver_name: str = Form(None),
+    license_plate: str = Form(None),
     db: Session = Depends(get_db),
 ):
     ctx = _get_user_ctx(request, db)
@@ -459,6 +473,9 @@ def enroll_post(
                         "email": email,
                         "birthdate": birthdate,
                         "tier": tier,
+                        "company_name": company_name,
+                        "driver_name": driver_name,
+                        "license_plate": license_plate,
                     },
                 },
             )
@@ -470,6 +487,9 @@ def enroll_post(
         birthdate=birthdate or None,
         tier=tier,
         store_id=store.id,
+        company_name=company_name.strip() if company_name and company_name.strip() else None,
+        driver_name=driver_name.strip() if driver_name and driver_name.strip() else None,
+        license_plate=license_plate.strip().upper() if license_plate and license_plate.strip() else None,
     )
     db.add(member)
     db.flush()  # รับ id ก่อน commit
@@ -478,7 +498,7 @@ def enroll_post(
     member.member_code = member_code.strip() if member_code and member_code.strip() else f"M{store.id:04d}{member.id:07d}"
     db.commit()
 
-    return RedirectResponse(f"/web/members?enrolled=1", status_code=302)
+    return RedirectResponse(f"/web/members/{member.id}/new-bill", status_code=302)
 
 
 # ──────────────────────────────────────────
@@ -554,6 +574,11 @@ def new_bill_post(
     note: str = Form(""),
     billing_profile_id: str = Form(""),
     vat_type: str = Form("none"),
+    new_bp_company: str = Form(""),
+    new_bp_tax_id: str = Form(""),
+    new_bp_address: str = Form(""),
+    new_bp_phone: str = Form(""),
+    new_bp_save: str = Form(""),
     db: Session = Depends(get_db),
 ):
     ctx = _get_user_ctx(request, db)
@@ -611,7 +636,29 @@ def new_bill_post(
 
     # Billing profile
     bp = None
-    if billing_profile_id:
+    bp_snapshot = None
+    if billing_profile_id == "__new__" and new_bp_company.strip():
+        company = new_bp_company.strip()
+        if new_bp_save:
+            new_bp = BillingProfile(
+                member_id=member_id,
+                label=company,
+                company_name=company,
+                tax_id=new_bp_tax_id.strip() or None,
+                address=new_bp_address.strip() or None,
+                phone=new_bp_phone.strip() or None,
+                is_default=False,
+            )
+            db.add(new_bp)
+            db.flush()
+        bp_snapshot = {
+            "company_name": company,
+            "tax_id": new_bp_tax_id.strip() or None,
+            "address": new_bp_address.strip() or None,
+            "phone": new_bp_phone.strip() or None,
+            "label": company,
+        }
+    elif billing_profile_id:
         try:
             bp = db.query(BillingProfile).filter(
                 BillingProfile.id == int(billing_profile_id),
@@ -633,6 +680,16 @@ def new_bill_post(
     db.commit()
     db.refresh(tx)
 
+    bp_payload = bp_snapshot or (
+        {
+            "company_name": bp.company_name if bp else None,
+            "tax_id": bp.tax_id if bp else None,
+            "address": bp.address if bp else None,
+            "phone": bp.phone if bp else None,
+            "label": bp.label if bp else None,
+        } if bp else None
+    )
+
     receipt = Receipt(
         transaction_id=tx.id,
         raw_payload={
@@ -645,13 +702,7 @@ def new_bill_post(
             "payment_method": payment_method,
             "note": note,
             "points_earned": points_earned,
-            "billing_profile": {
-                "company_name": bp.company_name if bp else None,
-                "tax_id": bp.tax_id if bp else None,
-                "address": bp.address if bp else None,
-                "phone": bp.phone if bp else None,
-                "label": bp.label if bp else None,
-            } if bp else None,
+            "billing_profile": bp_payload,
         },
         created_by_name=ctx["actor_name"],
         created_by_id=ctx["actor_id"],
@@ -688,9 +739,11 @@ def receipt_view(request: Request, receipt_id: int, db: Session = Depends(get_db
     payload = receipt.raw_payload or {}
     points_earned = payload.get("points_earned", 0)
     amount_text = thai_baht_text(payload.get("total", 0))
+    is_cash = bool(payload.get("is_cash")) or (tx and tx.member_id is None)
+    template_name = "receipt_cash.html" if is_cash else "receipt_view.html"
     return templates.TemplateResponse(
         request,
-        "receipt_view.html",
+        template_name,
         {
             "store_name": store.name,
             "store": store,
@@ -933,6 +986,9 @@ def member_edit_post(
     member_code: str = Form(None),
     birthdate: str = Form(None),
     tier: str = Form("general"),
+    company_name: str = Form(None),
+    driver_name: str = Form(None),
+    license_plate: str = Form(None),
     db: Session = Depends(get_db),
 ):
     ctx = _get_user_ctx(request, db)
@@ -963,6 +1019,9 @@ def member_edit_post(
     member.member_code = member_code.strip() if member_code and member_code.strip() else member.member_code
     member.birthdate = birthdate or None
     member.tier = tier
+    member.company_name = company_name.strip() if company_name and company_name.strip() else None
+    member.driver_name = driver_name.strip() if driver_name and driver_name.strip() else None
+    member.license_plate = license_plate.strip().upper() if license_plate and license_plate.strip() else None
     db.commit()
     return RedirectResponse(f"/web/members/{member_id}?updated=1", status_code=302)
 
@@ -1898,6 +1957,128 @@ def summary_export(
 # ──────────────────────────────────────────
 # Store owner dashboard
 # ──────────────────────────────────────────
+@router.get("/quick-bill", response_class=HTMLResponse)
+def quick_bill_page(request: Request, q: str = None, db: Session = Depends(get_db)):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    results = None
+    if q:
+        results = (
+            db.query(Member)
+            .filter(
+                Member.store_id == store.id,
+                (
+                    Member.name.ilike(f"%{q}%")
+                    | Member.phone.ilike(f"%{q}%")
+                    | Member.member_code.ilike(f"%{q}%")
+                    | Member.company_name.ilike(f"%{q}%")
+                    | Member.license_plate.ilike(f"%{q}%")
+                    | Member.driver_name.ilike(f"%{q}%")
+                ),
+            )
+            .order_by(Member.id.desc())
+            .limit(30)
+            .all()
+        )
+    return templates.TemplateResponse(request, "quick_bill.html", {
+        "store_name": store.name,
+        "user_role": ctx["role"],
+        "q": q,
+        "results": results,
+    })
+
+
+@router.get("/cash-bill", response_class=HTMLResponse)
+def cash_bill_page(request: Request, db: Session = Depends(get_db)):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    products = _get_products(db, store.id)
+    return templates.TemplateResponse(request, "cash_bill.html", {
+        "store_name": store.name,
+        "store": store,
+        "user_role": ctx["role"],
+        "products": products,
+    })
+
+
+@router.post("/cash-bill", response_class=HTMLResponse)
+def cash_bill_post(
+    request: Request,
+    items_json: str = Form(...),
+    customer_name: str = Form(""),
+    payment_method: str = Form("cash"),
+    note: str = Form(""),
+    vat_type: str = Form("none"),
+    db: Session = Depends(get_db),
+):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+
+    items = json.loads(items_json)
+    item_total = sum(float(i["qty"]) * float(i["price"]) for i in items)
+    vat_rate = store.vat_rate or 7.0
+
+    if vat_type == "exclusive":
+        subtotal = round(item_total, 2)
+        vat_amount = round(subtotal * vat_rate / 100, 2)
+        total = round(subtotal + vat_amount, 2)
+    elif vat_type == "inclusive":
+        total = round(item_total, 2)
+        subtotal = round(total / (1 + vat_rate / 100), 2)
+        vat_amount = round(total - subtotal, 2)
+    else:
+        subtotal = round(item_total, 2)
+        vat_amount = 0.0
+        vat_rate = 0.0
+        total = subtotal
+
+    tx = Transaction(
+        total=total,
+        payment_method=payment_method,
+        member_id=None,
+        terminal_id="web-cash",
+        raw={"items": items, "subtotal": subtotal, "vat_amount": vat_amount,
+             "vat_rate": vat_rate, "vat_type": vat_type, "total": total,
+             "payment_method": payment_method, "note": note,
+             "customer_name": customer_name.strip() or None},
+    )
+    db.add(tx)
+    db.commit()
+    db.refresh(tx)
+
+    receipt = Receipt(
+        transaction_id=tx.id,
+        raw_payload={
+            "items": items,
+            "subtotal": subtotal,
+            "vat_amount": vat_amount,
+            "vat_rate": vat_rate,
+            "vat_type": vat_type,
+            "total": total,
+            "payment_method": payment_method,
+            "note": note,
+            "customer_name": customer_name.strip() or None,
+            "points_earned": 0,
+            "billing_profile": None,
+            "is_cash": True,
+        },
+        created_by_name=ctx["actor_name"],
+        created_by_id=ctx["actor_id"],
+    )
+    db.add(receipt)
+    db.commit()
+    db.refresh(receipt)
+
+    return RedirectResponse(f"/web/receipts/{receipt.id}", status_code=302)
+
+
+
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard_page(request: Request, db: Session = Depends(get_db)):
     ctx = _get_user_ctx(request, db)

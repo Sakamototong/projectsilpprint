@@ -35,6 +35,14 @@ app = FastAPI(title="ProjectSilpPrint", lifespan=lifespan)
 app.state.limiter = limiter
 templates = Jinja2Templates(directory=str(_BASE_DIR / "templates"))
 
+# ── Number format filters (comma thousand separator) ──
+def _fmt(v, d=2):
+    try: return f"{float(v):,.{d}f}"
+    except (TypeError, ValueError): return "0." + "0"*d
+templates.env.filters["fmt"]  = lambda v: _fmt(v, 2)
+templates.env.filters["fmt0"] = lambda v: _fmt(v, 0)
+templates.env.filters["fmt1"] = lambda v: _fmt(v, 1)
+
 
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):

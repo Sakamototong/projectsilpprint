@@ -232,10 +232,10 @@
       <tr class="irow {{ 'irow-odd' if loop.index % 2 == 1 else 'irow-even' }}">
         <td class="tc">{{ loop.index }}</td>
         <td class="td-name">{{ item.get('name','') }}</td>
-        <td class="tc">{{ "%.2f"|format(item.get('qty',1)|float) }}</td>
+        <td class="tc">{{ item.get('qty',1)|float|fmt }}</td>
         <td class="tc td-unit">{{ item.get('unit','') }}</td>
-        <td class="tr">{{ "%.2f"|format(item.get('price',0)|float) }}</td>
-        <td class="tr bld">{{ "%.2f"|format((item.get('qty',1)|float)*(item.get('price',0)|float)) }}</td>
+        <td class="tr">{{ item.get('price',0)|float|fmt }}</td>
+        <td class="tr bld">{{ ((item.get('qty',1)|float)*(item.get('price',0)|float))|fmt }}</td>
       </tr>
       {% endfor %}
       {% for _ in range([0, 5 - items|length]|max) %}
@@ -255,14 +255,14 @@
     </div>
     <div class="inv-totals">
       <table class="sum-t">
-        <tr><td class="sk">รวม / TOTAL</td><td class="sv">{{ "%.2f"|format(subtotal) }}</td></tr>
+        <tr><td class="sk">รวม / TOTAL</td><td class="sv">{{ subtotal|fmt }}</td></tr>
         <tr>
           <td class="sk">ภาษี{% if vat_rate > 0 %} {{ vat_rate|int }}%{% endif %} / VAT</td>
-          <td class="sv">{{ "%.2f"|format(vat_amount) if vat_rate > 0 else '–' }}</td>
+          <td class="sv">{{ vat_amount|fmt if vat_rate > 0 else '–' }}</td>
         </tr>
         <tr class="sum-grand">
           <td class="sk">จำนวนรวมทั้งสิ้น<br><small>GRAND TOTAL</small></td>
-          <td class="sv bld">{{ "%.2f"|format(grand_total) }}</td>
+          <td class="sv bld">{{ grand_total|fmt }}</td>
         </tr>
       </table>
     </div>

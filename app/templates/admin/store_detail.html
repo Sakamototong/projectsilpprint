@@ -55,7 +55,7 @@
             <select name="plan_id" class="form-select form-select-sm" required>
               {% for p in plans %}
               <option value="{{ p.id }}" {% if store.requested_plan_id == p.id %}selected{% endif %}>
-                {{ p.name }} (฿{{ "%.0f"|format(p.price_monthly) }}/เดือน)
+                {{ p.name }} (฿{{ p.price_monthly|fmt0 }}/เดือน)
               </option>
               {% endfor %}
             </select>
@@ -130,7 +130,7 @@
             <div class="progress-bar {% if pct >= 90 %}bg-danger{% elif pct >= 70 %}bg-warning{% else %}bg-success{% endif %}"
               style="width:{{ [pct,100]|min }}%"></div>
           </div>
-          <div class="text-end mt-1 small text-muted">{{ "%.0f"|format(pct) }}%</div>
+          <div class="text-end mt-1 small text-muted">{{ pct|fmt0 }}%</div>
           {% else %}
           <div class="progress" style="height:8px">
             <div class="progress-bar bg-success" style="width:100%"></div>
@@ -254,7 +254,7 @@
         <td class="text-muted">{{ inv.id }}</td>
         <td>{{ inv.period_label or '—' }}</td>
         <td>{{ 'รายเดือน' if inv.billing_cycle == 'monthly' else 'รายปี' }}</td>
-        <td class="fw-semibold">฿{{ "%.0f"|format(inv.amount) }}</td>
+        <td class="fw-semibold">฿{{ inv.amount|fmt0 }}</td>
         <td>
           {% if inv.status == 'paid' %}<span class="badge bg-success">ชำระแล้ว</span>
           {% elif inv.status == 'overdue' %}<span class="badge bg-danger">เกินกำหนด</span>

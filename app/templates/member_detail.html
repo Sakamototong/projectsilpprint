@@ -42,7 +42,15 @@
           <i class="bi bi-person-fill text-white" style="font-size:2.5rem;"></i>
         </div>
       </div>
-      <h4 class="fw-bold">{{ member.name }}</h4>
+      <h4 class="fw-bold">
+        {% if member.company_name %}{{ member.company_name }}{% else %}{{ member.name }}{% endif %}
+      </h4>
+      {% if member.company_name %}
+      <div class="text-muted mb-1 small"><i class="bi bi-person me-1"></i>{{ member.name }}</div>
+      {% endif %}
+      {% if member.license_plate %}
+      <div class="mb-1"><span class="badge bg-secondary font-monospace">{{ member.license_plate }}</span>{% if member.driver_name %} <span class="small text-muted">{{ member.driver_name }}</span>{% endif %}</div>
+      {% endif %}
       {% set tc = {'general':'secondary','silver':'light','gold':'warning','platinum':'info'} %}
       <span class="badge tier-{{ member.tier or 'general' }} mb-3 fs-6">
         {{ {'general':'ทั่วไป','silver':'Silver','gold':'Gold','platinum':'Platinum'}.get(member.tier, member.tier) }}
@@ -113,6 +121,24 @@
             <td class="text-muted" style="width:40%">รหัสสมาชิก</td>
             <td><code>{{ member.member_code if member.member_code else '–' }}</code></td>
           </tr>
+          {% if member.company_name %}
+          <tr>
+            <td class="text-muted">บริษัท / องค์กร</td>
+            <td class="fw-bold">{{ member.company_name }}</td>
+          </tr>
+          {% endif %}
+          {% if member.driver_name %}
+          <tr>
+            <td class="text-muted">ผู้ขับ / ผู้ติดต่อ</td>
+            <td>{{ member.driver_name }}</td>
+          </tr>
+          {% endif %}
+          {% if member.license_plate %}
+          <tr>
+            <td class="text-muted">ทะเบียนรถ</td>
+            <td><span class="badge bg-secondary font-monospace">{{ member.license_plate }}</span></td>
+          </tr>
+          {% endif %}
           <tr>
             <td class="text-muted">เบอร์โทรศัพท์</td>
             <td>{{ member.phone if member.phone else '–' }}</td>
@@ -168,7 +194,7 @@
           <tr>
             <td class="font-monospace">#{{ '%05d'|format(r.id) }}</td>
             <td class="small">{{ r.printed_at.strftime('%d/%m/%Y %H:%M') if r.printed_at else '–' }}</td>
-            <td class="text-end fw-bold text-primary">฿{{ "%.2f"|format((r.raw_payload or {}).get('total', 0)|float) }}</td>
+            <td class="text-end fw-bold text-primary">฿{{ (r.raw_payload or {}).get('total', 0)|float|fmt }}</td>
             <td class="small">{{ pm_map.get((r.raw_payload or {}).get('payment_method',''), (r.raw_payload or {}).get('payment_method','–')) }}</td>
             <td class="text-center small">{{ (r.raw_payload or {}).get('items', [])|length }} รายการ</td>
             <td>

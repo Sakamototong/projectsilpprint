@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% block title %}ใบเสร็จเงินสด #{{ '%09d'|format(receipt.id) }}{% endblock %}
+{% block content %}
+
+{# ─── resolve data ─── #}
+{% set cust_name   = payload.get('customer_name') or 'ลูกค้าทั่วไป' %}
+{% set items       = payload.get('items', []) %}
+{% set subtotal    = payload.get('subtotal',  payload.get('total', 0)) | float %}
+{% set vat_amount  = payload.get('vat_amount', 0) | float %}
+{% set vat_rate    = payload.get('vat_rate',   0) | float %}
+{% set grand_total = payload.get('total', 0) | float %}
+{% set pm_map = {'cash':'เงินสด','transfer':'โอนเงิน','qr':'QR / PromptPay','card':'บัตรเครดิต/เดบิต'} %}
+{% set pm_label = pm_map.get(payload.get('payment_method',''), payload.get('payment_method','–')) %}
+{% set doc_no = '%09d'|format(receipt.id) %}
+{% if receipt.printed_at %}
+  {% set doc_date = receipt.printed_at.strftime('%d/%m/') ~ (receipt.printed_at.year + 543) %}
+{% else %}
+  {% set doc_date = '–' %}
+{% endif %}
+
+{# ─── screen toolbar ─── #}
+<div class="d-flex align-items-center mb-3 gap-2 d-print-none">
+  <a href="/web/quick-bill" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i> กลับ
+  </a>
+  <span class="fw-bold text-dark"><i class="bi bi-cash me-1 text-success"></i>ใบเสร็จเงินสด #{{ doc_no }}</span>
+  {% if is_deleted %}
+  <span class="badge bg-danger ms-1"><i class="bi bi-trash-fill me-1"></i>ถูกลบแล้ว</span>
+  {% endif %}
+  <div class="ms-auto d-flex gap-2">
+    <a href="/web/cash-bill" class="btn btn-success btn-sm">
+      <i class="bi bi-plus-circle me-1"></i>บิลเงินสดใหม่
+    </a>
+    {% if not is_deleted and user_role in ['owner', 'admin'] %}
+    <button type="button" class="btn btn-outline-danger btn-sm"
+            data-bs-toggle="modal" data-bs-target="#deleteReceiptModal">
+      <i class="bi bi-trash me-1"></i>ลบ
+    </button>
+    {% endif %}
+    <button onclick="window.print()" class="btn btn-primary btn-sm">
+      <i class="bi bi-printer-fill me-1"></i>พิมพ์
+    </button>
+  </div>
+</div>
+
+{# ─── Audit trail banner ─── #}
+<div class="d-print-none mb-3">
+  <div class="card border-0 bg-light">
+    <div class="card-body py-2 px-3 small text-muted">
+      <i class="bi bi-person-check-fill text-primary me-1"></i>
+      <strong>ออกบิลโดย:</strong> {{ receipt.created_by_name or '–' }}
+      {% if receipt.printed_at %}
+      &nbsp;·&nbsp;{{ receipt.printed_at.strftime('%d/%m/') }}{{ receipt.printed_at.year + 543 }}
+      {{ receipt.printed_at.strftime('%H:%M') }}
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# ─── Delete modal ─── #}
+{% if not is_deleted %}
+<div class="modal fade" id="deleteReceiptModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-danger fw-bold">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i>ยืนยันลบใบเสร็จ
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>ลบใบเสร็จ <strong>#{{ doc_no }}</strong> ใช่หรือไม่?</p>
+        <p class="text-danger small mb-0">การลบไม่สามารถเรียกคืนได้</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+        <form method="post" action="/web/receipts/{{ receipt.id }}/delete">
+          <button type="submit" class="btn btn-danger"><i class="bi bi-trash me-1"></i>ยืนยันลบ</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ═══ CASH RECEIPT SHEET ═══ #}
+{% macro render_copy(copy_type) %}
+<div class="inv-copy {{ 'is-orig' if copy_type == 'original' else 'is-copy' }}">
+
+  <div class="inv-head">
+    <div class="inv-head-accent" style="background:linear-gradient(90deg,#166534,#22c55e)"></div>
+    <div class="inv-head-body">
+      <div class="inv-head-store">
+        <div class="s-name">{{ store_name }}</div>
+        {% if store.address %}<div class="s-info">{{ store.address }}</div>{% endif %}
+        {% if store.tax_id  %}<div class="s-info">เลขประจำตัวผู้เสียภาษี {{ store.tax_id }}</div>{% endif %}
+        <div class="s-info-row">
+          {% if store.phone %}<span>โทร. {{ store.phone }}</span>{% endif %}
+          {% if store.email %}<span>{{ store.email }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="inv-head-title">
+        <div class="t-docset">เอกสารออกเป็นชุด / DOCUMENT SET</div>
+        <div class="t-box">
+          <div class="t-th">
+            {% if copy_type == 'original' %}ใบเสร็จรับเงิน (เงินสด){% else %}สำเนาใบเสร็จรับเงิน{% endif %}
+          </div>
+          <div class="t-en">
+            {% if copy_type == 'original' %}CASH RECEIPT ORIGINAL{% else %}CASH RECEIPT COPY{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="inv-cust-row">
+    <div class="inv-cust">
+      <div class="c-label">ชื่อลูกค้า <span>CUSTOMER NAME</span></div>
+      <div class="c-name">{{ cust_name }}</div>
+      {% if payload.get('note') %}<div class="c-info">หมายเหตุ: {{ payload.get('note') }}</div>{% endif %}
+    </div>
+    <div class="inv-meta">
+      <table class="meta-t">
+        <tr><td class="mk">วันที่ / DATE</td><td class="mv">{{ doc_date }}</td></tr>
+        <tr><td class="mk">เลขที่ / NO.</td><td class="mv fw-bold">{{ doc_no }}</td></tr>
+        <tr><td class="mk">ชำระโดย / PAYMENT</td><td class="mv">{{ pm_label }}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <table class="items-t">
+    <thead>
+      <tr>
+        <th class="i-no">ลำดับ<br><small>ITEM</small></th>
+        <th class="i-ds">รายการ<br><small>DESCRIPTION</small></th>
+        <th class="i-qt">จำนวน<br><small>QUANTITY</small></th>
+        <th class="i-un">หน่วย<br><small>UNIT</small></th>
+        <th class="i-up">ราคา/หน่วย<br><small>UNIT PRICE</small></th>
+        <th class="i-am">จำนวนเงิน<br><small>AMOUNT</small></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr class="irow {{ 'irow-odd' if loop.index % 2 == 1 else 'irow-even' }}">
+        <td class="tc">{{ loop.index }}</td>
+        <td class="td-name">{{ item.get('name','') }}</td>
+        <td class="tc">{{ item.get('qty',1)|float|fmt }}</td>
+        <td class="tc td-unit">{{ item.get('unit','') }}</td>
+        <td class="tr">{{ item.get('price',0)|float|fmt }}</td>
+        <td class="tr bld">{{ ((item.get('qty',1)|float)*(item.get('price',0)|float))|fmt }}</td>
+      </tr>
+      {% endfor %}
+      {% for _ in range([0, 5 - items|length]|max) %}
+      <tr class="irow-blank"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="inv-bot">
+    <div class="inv-notes">
+      <div class="amt-words"><strong>{{ amount_text }}</strong></div>
+    </div>
+    <div class="inv-totals">
+      <table class="sum-t">
+        {% if vat_rate > 0 %}
+        <tr><td class="sk">รวม / TOTAL</td><td class="sv">{{ subtotal|fmt }}</td></tr>
+        <tr>
+          <td class="sk">ภาษี {{ vat_rate|int }}% / VAT</td>
+          <td class="sv">{{ vat_amount|fmt }}</td>
+        </tr>
+        {% endif %}
+        <tr class="sum-grand">
+          <td class="sk">จำนวนรวมทั้งสิ้น<br><small>GRAND TOTAL</small></td>
+          <td class="sv bld">{{ grand_total|fmt }}</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="inv-sigs">
+    <div class="sig-cell">
+      <div class="sig-dash"></div>
+      <div class="sig-lbl">ผู้รับเงิน / CASHIER</div>
+      <div class="sig-dt">วันที่ / DATE ___________</div>
+    </div>
+    <div class="sig-cell">
+      <div class="sig-dash"></div>
+      <div class="sig-lbl">ผู้จ่ายเงิน / CUSTOMER</div>
+      <div class="sig-dt">วันที่ / DATE ___________</div>
+    </div>
+    <div class="sig-cell">
+      <div class="sig-dash"></div>
+      <div class="sig-lbl">ผู้มีอำนาจอนุมัติ / AUTHORIZER</div>
+    </div>
+  </div>
+
+</div>
+{% endmacro %}
+
+<div class="inv-sheet">
+  {{ render_copy('original') }}
+  <div class="cut-line">
+    <span>✂&nbsp;&nbsp;ตัดตรงนี้ / CUT HERE&nbsp;&nbsp;✂</span>
+  </div>
+  {{ render_copy('copy') }}
+</div>
+
+<style>
+/* ── reuse identical CSS from receipt_view.html ─────────────── */
+.inv-sheet *, .inv-sheet *::before, .inv-sheet *::after {
+  box-sizing: border-box;
+  font-family: 'Sarabun','TH SarabunNew','Noto Sans Thai',Tahoma,sans-serif;
+  color: #000 !important;
+  line-height: 1.4;
+}
+a, a:hover { color: #000 !important; text-decoration: none !important; }
+.inv-sheet { width: 210mm; margin: 0 auto 24px; }
+.inv-copy { width: 210mm; background: #fff; border: 1px solid #c0c0c0;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15); overflow: hidden; font-size: 8pt; }
+.inv-head-accent { height: 5px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.inv-head-body { display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 4mm 6mm 3mm; }
+.inv-head-store { flex: 1; }
+.s-name { font-size: 14pt; font-weight: 900; letter-spacing: -0.3px; line-height: 1.15; margin-bottom: 2px; }
+.s-info { font-size: 7.5pt; line-height: 1.7; }
+.s-info-row { display: flex; gap: 14px; font-size: 7.5pt; margin-top: 1px; }
+.inv-head-title { text-align: right; min-width: 140px; }
+.t-docset { font-size: 6pt; letter-spacing: 0.3px; margin-bottom: 5px; }
+.is-orig .t-box { display: inline-block; background: #166534 !important;
+  border: 2px solid #166534; padding: 5px 14px; text-align: center;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.is-orig .t-th, .is-orig .t-en { color: #fff !important; }
+.is-copy .t-box { display: inline-block; background: #e2e2e2 !important;
+  border: 2px solid #777; padding: 5px 14px; text-align: center;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.t-th { font-size: 11pt; font-weight: 900; }
+.t-en { font-size: 8.5pt; font-weight: 700; }
+.inv-cust-row { display: flex; border-top: 1.5px solid #bbb; }
+.inv-cust { flex: 1; padding: 4px 6px; border-right: 1.5px solid #bbb; min-height: 18mm; }
+.c-label { font-size: 6.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+  border-bottom: 1px solid #e0e0e0; padding-bottom: 2px; margin-bottom: 3px; }
+.c-label span { font-weight: 400; }
+.c-name { font-size: 10.5pt; font-weight: 800; margin-bottom: 2px; }
+.c-info { font-size: 7.5pt; line-height: 1.6; }
+.inv-meta { min-width: 45%; }
+.meta-t { width: 100%; border-collapse: collapse; }
+.mk { font-size: 7pt; font-weight: 600; background: #f3f3f3 !important;
+  border-bottom: 1px solid #ddd; border-right: 1px solid #ddd;
+  padding: 3px 5px; white-space: nowrap;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.mv { font-size: 7.5pt; padding: 3px 6px; border-bottom: 1px solid #eee; white-space: nowrap; }
+.items-t { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
+.items-t thead th { background: #166534 !important; color: #fff !important;
+  border: 1px solid #0f4622; padding: 3px 4px; text-align: center;
+  font-size: 7pt; font-weight: 700; line-height: 1.3;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.items-t thead th small { font-size: 5.5pt; font-weight: 400; display: block; color: #86efac !important; }
+.i-no { width: 6%; } .i-ds { width: 38%; } .i-qt { width: 11%; }
+.i-un { width: 9%; } .i-up { width: 18%; } .i-am { width: 18%; }
+.items-t tbody td { border: 1px solid #e0e0e0; padding: 3px 4px; }
+.irow-even td { background: #f0fdf4 !important;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.irow-blank td { border: 1px solid #ececec; height: 14px; }
+.tc { text-align: center; } .tr { text-align: right; } .bld { font-weight: 700; }
+.td-unit { font-size: 7pt; }
+.inv-bot { display: flex; border-top: 1.5px solid #bbb; }
+.inv-notes { flex: 1; padding: 4px 6px; display: flex; align-items: center; }
+.amt-words { font-size: 8pt; font-weight: 700; }
+.inv-totals { min-width: 45%; border-left: 1px solid #ddd; }
+.sum-t { width: 100%; border-collapse: collapse; }
+.sk { font-size: 7.5pt; font-weight: 600; padding: 3px 5px;
+  border-bottom: 1px solid #e8e8e8; border-right: 1px solid #e8e8e8; }
+.sv { font-size: 7.5pt; text-align: right; padding: 3px 6px;
+  border-bottom: 1px solid #e8e8e8; white-space: nowrap; }
+.sum-grand { background: #f0fdf4 !important;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.sum-grand .sk { font-size: 8.5pt; font-weight: 900; }
+.sum-grand .sv { font-size: 12pt; font-weight: 900; }
+.inv-sigs { display: flex; border-top: 1.5px solid #bbb; }
+.sig-cell { flex: 1; padding: 5px 6px 6px; border-right: 1px solid #ddd; min-height: 18mm; display: flex; flex-direction: column; align-items: center; }
+.sig-cell:last-child { border-right: none; }
+.sig-dash { width: 85%; border-bottom: 1px dashed #999; margin-top: auto; margin-bottom: 4px; }
+.sig-lbl { font-size: 7pt; font-weight: 700; text-align: center; }
+.sig-dt  { font-size: 6.5pt; text-align: center; margin-top: 3px; }
+
+/* cut line */
+.cut-line { text-align: center; font-size: 8pt; color: #888; padding: 4px 0;
+  border-top: 1px dashed #bbb; border-bottom: 1px dashed #bbb; margin: 4mm 0; }
+
+/* ── PRINT ────────────────────────────── */
+@media print {
+  body, html { background: #fff !important; }
+  .d-print-none { display: none !important; }
+  .inv-sheet { margin: 0; width: 210mm; }
+  .inv-copy { box-shadow: none; border: none; }
+  .cut-line { color: #666; }
+  @page { size: A4 portrait; margin: 6mm 6mm; }
+}
+</style>
+
+{% endblock %}

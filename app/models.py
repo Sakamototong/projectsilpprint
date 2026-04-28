@@ -95,6 +95,10 @@ class Member(Base):
     points = Column(Integer, default=0)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # ข้อมูลบริษัท / ยานพาหนะ
+    company_name = Column(String, nullable=True)
+    driver_name = Column(String, nullable=True)
+    license_plate = Column(String, nullable=True)
     store = relationship("Store", back_populates="members")
     transactions = relationship("Transaction", back_populates="member", order_by="Transaction.timestamp.desc()")
     billing_profiles = relationship("BillingProfile", back_populates="member", order_by="BillingProfile.id")

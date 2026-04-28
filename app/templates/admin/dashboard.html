@@ -76,7 +76,7 @@
           {% for inv in recent_invoices %}
           <tr>
             <td class="fw-semibold">{{ inv.store_name }}</td>
-            <td>฿{{ "%.0f"|format(inv.amount) }}</td>
+            <td>฿{{ inv.amount|fmt0 }}</td>
             <td>
               {% if inv.status == 'paid' %}<span class="badge bg-success">ชำระแล้ว</span>
               {% elif inv.status == 'overdue' %}<span class="badge bg-danger">เกินกำหนด</span>

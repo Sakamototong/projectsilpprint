@@ -68,6 +68,14 @@ def _usage_for_store(store: Store, db) -> dict:
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
+# ── Number format filters (comma thousand separator) ──
+def _fmt(v, d=2):
+    try: return f"{float(v):,.{d}f}"
+    except (TypeError, ValueError): return "0." + "0"*d
+templates.env.filters["fmt"]  = lambda v: _fmt(v, 2)
+templates.env.filters["fmt0"] = lambda v: _fmt(v, 0)
+templates.env.filters["fmt1"] = lambda v: _fmt(v, 1)
+
 _TH_MONTHS = [
     "", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
     "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",

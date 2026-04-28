@@ -95,7 +95,7 @@
         <td class="text-muted">{{ inv.id }}</td>
         <td>{{ inv.period_label or '—' }}</td>
         <td>{{ 'รายเดือน' if inv.billing_cycle == 'monthly' else 'รายปี' }}</td>
-        <td class="fw-semibold">฿{{ "%.0f"|format(inv.amount) }}</td>
+        <td class="fw-semibold">฿{{ inv.amount|fmt0 }}</td>
         <td>
           {% if inv.status == 'paid' %}<span class="badge bg-success">ชำระแล้ว</span>
           {% elif inv.status == 'overdue' %}<span class="badge bg-danger">เกินกำหนด</span>

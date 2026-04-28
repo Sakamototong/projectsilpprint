@@ -1,9 +1,12 @@
 <!DOCTYPE html>
 <html lang="th" data-theme="light">
 <head>
-<!-- Always start with light theme -->
+<!-- Apply saved theme; default = light -->
 <script>
-  document.documentElement.setAttribute('data-theme', 'light');
+  (function(){
+    var t = localStorage.getItem('sp-theme') || 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
 </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -45,55 +48,65 @@
 
     /* ─── Navbar ─── */
     .navbar.bg-primary {
-      background: rgba(11,17,32,.9) !important;
-      backdrop-filter: blur(14px);
-      border-bottom: 1px solid var(--sp-border);
-      box-shadow: none;
-      padding-top: .6rem;
-      padding-bottom: .6rem;
+      background: linear-gradient(135deg, rgba(10,14,28,.97) 0%, rgba(20,30,60,.97) 100%) !important;
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      box-shadow: 0 4px 24px rgba(0,0,0,.35);
+      padding-top: 1rem;
+      padding-bottom: 1rem;
     }
     .navbar-brand {
-      font-weight: 800;
-      font-size: 1.05rem;
+      font-weight: 900;
+      font-size: 1.5rem;
+      letter-spacing: -.3px;
       color: var(--sp-white) !important;
       display: flex;
       align-items: center;
-      gap: .4rem;
+      gap: .5rem;
     }
     .navbar-brand::before {
       content: '';
       display: inline-block;
-      width: 26px; height: 26px;
+      width: 36px; height: 36px;
       background: var(--sp-blue);
-      border-radius: 7px;
+      border-radius: 9px;
       background-image: url("data:image/svg+xml,%3Csvg width='26' height='26' viewBox='0 0 28 28' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10h14M7 14h9M7 18h11' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
       background-size: cover;
       flex-shrink: 0;
     }
-    .navbar-text { color: var(--sp-slate) !important; font-size: .82rem; }
+    .navbar-text { color: var(--sp-slate) !important; font-size: 1rem; }
     .sp-nav-store {
       display: flex;
       align-items: center;
-      gap: .4rem;
-      color: var(--sp-slate);
-      font-size: .82rem;
+      gap: .45rem;
+      color: rgba(255,255,255,.65);
+      font-size: .95rem;
     }
 
     /* Nav links */
     .btn-outline-light.btn-sm {
-      border-color: var(--sp-border);
-      color: var(--sp-slate);
-      background: transparent;
-      border-radius: 8px;
-      font-size: .78rem;
+      border-color: rgba(255,255,255,.22);
+      color: rgba(255,255,255,.85);
+      background: rgba(255,255,255,.06);
+      border-radius: 12px;
+      font-size: 4rem;
       font-weight: 500;
-      padding: .3rem .7rem;
-      transition: all .2s;
+      padding: 1.7rem 3.6rem;
+      transition: all .18s;
     }
     .btn-outline-light.btn-sm:hover {
-      background: rgba(255,255,255,.07);
-      border-color: rgba(255,255,255,.15);
-      color: var(--sp-white);
+      background: rgba(255,255,255,.14);
+      border-color: rgba(255,255,255,.45);
+      color: #fff;
+    }
+    /* Uniform font size for ALL navbar buttons */
+    .navbar .btn-sm { font-size: 1rem; padding: .42rem .9rem; }
+    /* Hero action buttons — ออกบิล & สมัครสมาชิก */
+    .navbar .sp-btn-hero {
+      font-size: 1.55rem !important;
+      padding: .75rem 1.8rem !important;
+      border-radius: 12px !important;
+      font-weight: 700 !important;
     }
     .btn-outline-danger.btn-sm {
       border-color: rgba(239,68,68,.35);
@@ -213,9 +226,15 @@
       color: #fff !important;
     }
     .btn-warning {
-      background: var(--sp-warning) !important;
-      border-color: var(--sp-warning) !important;
-      color: #0B1120 !important;
+      background: #d97706 !important;
+      border-color: #b45309 !important;
+      color: #fff !important;
+    }
+    .btn-warning:hover, .btn-warning:focus, .btn-warning:active {
+      background: #b45309 !important;
+      border-color: #92400e !important;
+      color: #fff !important;
+      transform: translateY(-1px);
     }
     .btn-secondary, .btn-outline-secondary {
       background: transparent !important;
@@ -420,22 +439,25 @@
       color: var(--sp-white);
     }
 
-    /* Navbar → white with bottom border */
+    /* Navbar → frosted glass */
     html[data-theme="light"] .navbar.bg-primary {
-      background: rgba(255,255,255,.95) !important;
-      border-bottom: 1px solid rgba(0,0,0,.09);
+      background: rgba(255,255,255,.92) !important;
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(0,0,0,.1);
+      box-shadow: 0 2px 16px rgba(0,0,0,.08);
     }
     html[data-theme="light"] .navbar-brand { color: #0F172A !important; }
     html[data-theme="light"] .sp-nav-store { color: #475569; }
 
     /* Nav buttons in light mode */
     html[data-theme="light"] .btn-outline-light.btn-sm {
-      border-color: rgba(0,0,0,.15);
+      border-color: rgba(0,0,0,.18);
       color: #334155;
+      background: rgba(0,0,0,.03);
     }
     html[data-theme="light"] .btn-outline-light.btn-sm:hover {
-      background: rgba(0,0,0,.05);
-      border-color: rgba(0,0,0,.2);
+      background: rgba(0,0,0,.07);
+      border-color: rgba(0,0,0,.28);
       color: #0F172A;
     }
     html[data-theme="light"] .btn-outline-danger.btn-sm {
@@ -616,6 +638,14 @@
     #sp-theme-toggle:hover { background: rgba(128,128,128,.1); color: var(--sp-white); }
     html[data-theme="light"] #sp-theme-toggle { border-color: rgba(0,0,0,.15); color: #475569; }
     html[data-theme="light"] #sp-theme-toggle:hover { background: rgba(0,0,0,.05); color: #0F172A; }
+    /* qty spinner arrows */
+    .sp-qty::-webkit-outer-spin-button,
+    .sp-qty::-webkit-inner-spin-button {
+      -webkit-appearance: inner-spin-button !important;
+      opacity: 1 !important;
+      width: 20px;
+    }
+    .sp-qty { -moz-appearance: number-input !important; }
   </style>
   {% block head %}{% endblock %}
 </head>
@@ -638,7 +668,7 @@
         <span class="badge bg-secondary">User</span>
       {% endif %}
     </div>
-    <div class="ms-auto d-flex gap-1 flex-wrap align-items-center">
+    <div class="ms-auto d-flex gap-2 flex-wrap align-items-center">
       <!-- Theme toggle -->
       <button id="sp-theme-toggle" title="สลับธีม" onclick="spToggleTheme()">
         <i class="bi bi-sun-fill" id="sp-theme-icon"></i>
@@ -646,16 +676,19 @@
       <a class="btn btn-outline-light btn-sm" href="/web/dashboard">
         <i class="bi bi-speedometer2"></i> แดชบอร์ด
       </a>
-      <a class="btn btn-outline-light btn-sm" href="/web/enroll">
+      <a class="btn btn-primary btn-sm" href="/web/enroll">
         <i class="bi bi-person-plus-fill"></i> สมัครสมาชิก
       </a>
-      <a class="btn btn-outline-light btn-sm" href="/web/members">
+      <a class="btn btn-warning btn-sm fw-bold" href="/web/quick-bill">
+        <i class="bi bi-receipt-cutoff"></i> ออกบิล
+      </a>
+      <a class="btn btn-outline-info btn-sm" href="/web/members">
         <i class="bi bi-people-fill"></i> รายชื่อ
       </a>
       <a class="btn btn-outline-light btn-sm" href="/web/products">
         <i class="bi bi-box-seam"></i> สินค้า
       </a>
-      <a class="btn btn-outline-light btn-sm" href="/web/summary">
+      <a class="btn btn-outline-success btn-sm" href="/web/summary">
         <i class="bi bi-bar-chart-fill"></i> สรุป
       </a>
       <a class="btn btn-outline-light btn-sm" href="/web/subscription">
@@ -672,7 +705,7 @@
       <a class="btn btn-outline-light btn-sm" href="/web/change-password">
         <i class="bi bi-key-fill"></i> รหัสผ่าน
       </a>
-      <a class="btn btn-outline-danger btn-sm" href="/web/logout">
+      <a class="btn btn-danger btn-sm" href="/web/logout">
         <i class="bi bi-box-arrow-right"></i> ออก
       </a>
     </div>
@@ -692,6 +725,7 @@ function spToggleTheme() {
   var current = html.getAttribute('data-theme') || 'light';
   var next = current === 'dark' ? 'light' : 'dark';
   html.setAttribute('data-theme', next);
+  localStorage.setItem('sp-theme', next);
   spUpdateIcon(next);
 }
 function spUpdateIcon(theme) {
@@ -699,9 +733,8 @@ function spUpdateIcon(theme) {
   if (!icon) return;
   icon.className = theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
 }
-// Always light on load, clear any saved dark preference
-localStorage.removeItem('sp-theme');
-spUpdateIcon('light');
+// Init icon to match current theme (default light if no preference saved)
+spUpdateIcon(localStorage.getItem('sp-theme') || 'light');
 
 // ─── Bootstrap validation ───
 (function() {

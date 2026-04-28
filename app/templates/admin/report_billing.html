@@ -63,7 +63,7 @@
       <div class="card-body py-3">
         <div class="text-muted small mb-1">ชำระแล้ว</div>
         <div class="fs-4 fw-bold text-success">฿{{ "{:,.0f}".format(billing_totals.total_paid) }}</div>
-        <div class="small text-success">{{ "%.1f"|format(billing_totals.collection_rate) }}% collection rate</div>
+        <div class="small text-success">{{ billing_totals.collection_rate|fmt1 }}% collection rate</div>
       </div>
     </div>
   </div>

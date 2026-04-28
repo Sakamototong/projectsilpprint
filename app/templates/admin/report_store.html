@@ -160,7 +160,7 @@
                 <div class="progress flex-grow-1" style="height:6px">
                   <div class="progress-bar bg-success" style="width:{{ pct | int }}%"></div>
                 </div>
-                <small class="text-muted">{{ "%.0f"|format(pct) }}%</small>
+                <small class="text-muted">{{ pct|fmt0 }}%</small>
               </div>
             </td>
           </tr>

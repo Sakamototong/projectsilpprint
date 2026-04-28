@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}ออกบิล – SilpPrint{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-center mb-4">
+  <h5 class="mb-0 fw-bold">
+    <i class="bi bi-receipt-cutoff me-2 text-warning"></i>ออกบิลใหม่
+  </h5>
+</div>
+
+<!-- Search box -->
+<div class="row justify-content-center mb-4">
+  <div class="col-lg-8">
+    <form method="get" action="/web/quick-bill" class="d-flex gap-2">
+      <input type="text" name="q" value="{{ q or '' }}" class="form-control form-control-lg"
+             placeholder="ค้นหาด้วย ชื่อบริษัท, ผู้ขับ, เบอร์โทร, ทะเบียนรถ, เลขสมาชิก..."
+             autofocus autocomplete="off">
+      <button type="submit" class="btn btn-warning px-4">
+        <i class="bi bi-search"></i>
+      </button>
+    </form>
+  </div>
+</div>
+
+{% if q is not none %}
+
+{% if results %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="mb-2 text-muted small">พบ {{ results|length }} รายการ</div>
+    {% for m in results %}
+    <a href="/web/members/{{ m.id }}/new-bill" class="text-decoration-none">
+      <div class="card mb-2 p-3 border hover-card">
+        <div class="d-flex align-items-center gap-3">
+          <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center flex-shrink-0"
+               style="width:44px;height:44px;">
+            <i class="bi bi-building text-white"></i>
+          </div>
+          <div class="flex-grow-1">
+            <div class="fw-bold">
+              {% if m.company_name %}{{ m.company_name }}{% else %}{{ m.name }}{% endif %}
+            </div>
+            {% if m.company_name %}
+            <div class="small text-muted">{{ m.name }}</div>
+            {% endif %}
+            <div class="d-flex flex-wrap gap-2 mt-1">
+              {% if m.license_plate %}
+              <span class="badge bg-secondary font-monospace">{{ m.license_plate }}</span>
+              {% endif %}
+              {% if m.driver_name %}
+              <span class="small text-muted"><i class="bi bi-person me-1"></i>{{ m.driver_name }}</span>
+              {% endif %}
+              {% if m.phone %}
+              <span class="small text-muted"><i class="bi bi-telephone me-1"></i>{{ m.phone }}</span>
+              {% endif %}
+              <span class="badge tier-{{ m.tier or 'general' }}">
+                {{ {'general':'ทั่วไป','silver':'Silver','gold':'Gold','platinum':'Platinum'}.get(m.tier, m.tier) }}
+              </span>
+              <span class="small text-muted"><i class="bi bi-star-fill text-warning me-1"></i>{{ m.points }} คะแนน</span>
+            </div>
+          </div>
+          <div class="text-primary flex-shrink-0">
+            <i class="bi bi-arrow-right-circle fs-4"></i>
+          </div>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+{% else %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card p-4 text-center text-muted">
+      <i class="bi bi-search fs-3 mb-2"></i>
+      <p class="mb-2">ไม่พบสมาชิกที่ตรงกับ "<strong>{{ q }}</strong>"</p>
+      <div class="d-flex gap-2 justify-content-center mt-2">
+        <a href="/web/enroll" class="btn btn-primary btn-sm">
+          <i class="bi bi-person-plus me-1"></i>สมัครสมาชิกใหม่
+        </a>
+        <a href="/web/cash-bill" class="btn btn-outline-warning btn-sm">
+          <i class="bi bi-cash me-1"></i>ออกบิลเงินสด (ไม่มีสมาชิก)
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+<!-- No search yet — show shortcuts -->
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="row g-3">
+      <div class="col-sm-6">
+        <a href="/web/enroll" class="text-decoration-none">
+          <div class="card p-4 text-center h-100">
+            <i class="bi bi-person-plus fs-2 text-primary mb-2"></i>
+            <div class="fw-bold">สมัครสมาชิกใหม่</div>
+            <div class="small text-muted mt-1">แล้วออกบิลได้ทันที</div>
+          </div>
+        </a>
+      </div>
+      <div class="col-sm-6">
+        <a href="/web/cash-bill" class="text-decoration-none">
+          <div class="card p-4 text-center h-100">
+            <i class="bi bi-cash fs-2 text-success mb-2"></i>
+            <div class="fw-bold">บิลเงินสด (Walk-in)</div>
+            <div class="small text-muted mt-1">ออกบิลโดยไม่ต้องมีสมาชิก</div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<style>
+.hover-card { transition: border-color .15s, box-shadow .15s; cursor: pointer; }
+.hover-card:hover { border-color: var(--sp-blue) !important; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+</style>
+
+{% endblock %}

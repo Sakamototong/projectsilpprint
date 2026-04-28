@@ -20,12 +20,39 @@
       {% endif %}
 
       <form method="post" action="/web/enroll" class="needs-validation" novalidate>
+
+        <!-- บริษัท / ยานพาหนะ -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold fs-5"><i class="bi bi-building me-1 text-primary"></i>ชื่อบริษัท / องค์กร <span class="text-muted small fw-normal">(ถ้ามี)</span></label>
+          <input type="text" name="company_name" class="form-control form-control-lg" autofocus
+                 placeholder="ชื่อบริษัท / หน่วยงาน"
+                 value="{{ form.company_name if form else '' }}">
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold"><i class="bi bi-person me-1"></i>ชื่อผู้ขับ / ผู้ติดต่อ</label>
+            <input type="text" name="driver_name" class="form-control"
+                   placeholder="ชื่อคนขับ / ผู้ติดต่อ"
+                   value="{{ form.driver_name if form else '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold"><i class="bi bi-card-text me-1"></i>ทะเบียนรถ</label>
+            <input type="text" name="license_plate" class="form-control"
+                   placeholder="เช่น กข-1234 หรือ 80-1234"
+                   value="{{ form.license_plate if form else '' }}">
+          </div>
+        </div>
+
+        <hr class="my-3">
+
         <!-- ข้อมูลหลัก -->
         <div class="mb-3">
           <label class="form-label fw-semibold">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
-          <input type="text" name="name" class="form-control form-control-lg" required autofocus
+          <input type="text" name="name" class="form-control form-control-lg" required
                  placeholder="กรุณากรอกชื่อ-นามสกุล"
                  value="{{ form.name if form else '' }}">
+        </div>
         </div>
 
         <div class="row g-3 mb-3">
@@ -76,9 +103,9 @@
 
         <div class="d-flex gap-2">
           <button type="submit" class="btn btn-primary btn-lg flex-fill">
-            <i class="bi bi-check-circle me-1"></i>บันทึกสมาชิก
+            <i class="bi bi-receipt-cutoff me-1"></i>บันทึก &amp; ออกบิลทันที
           </button>
-          <a href="/web/members" class="btn btn-outline-secondary btn-lg flex-fill">
+          <a href="/web/members" class="btn btn-outline-secondary btn-lg">
             <i class="bi bi-x-circle me-1"></i>ยกเลิก
           </a>
         </div>

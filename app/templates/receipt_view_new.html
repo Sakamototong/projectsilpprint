@@ -144,13 +144,13 @@
         <tr>
           <td class="text-center">{{ loop.index }}</td>
           <td>{{ item.get('name', '') }}</td>
-          <td class="text-center">{{ "%.2f"|format(item.get('qty', 1)|float) }}</td>
+          <td class="text-center">{{ item.get('qty', 1)|float|fmt }}</td>
           <td class="text-center text-muted">{{ item.get('unit', '') }}</td>
-          <td class="text-end">{{ "%.2f"|format(item.get('price', 0)|float) }}</td>
+          <td class="text-end">{{ item.get('price', 0)|float|fmt }}</td>
           <td class="text-end text-muted">–</td>
           <td class="text-end fw-bold">
             {%- set line = (item.get('qty', 1)|float) * (item.get('price', 0)|float) -%}
-            {{ "%.2f"|format(line) }}
+            {{ line|fmt }}
           </td>
         </tr>
         {% endfor %}
@@ -174,20 +174,20 @@
             {% if vat_rate > 0 %}
             <tr>
               <td class="sl">ราคาสินค้า</td>
-              <td class="sv">{{ "%.2f"|format(subtotal) }}</td>
+              <td class="sv">{{ subtotal|fmt }}</td>
             </tr>
             <tr>
               <td class="sl">ภาษีมูลค่าเพิ่ม {{ vat_rate|int }}%</td>
-              <td class="sv">{{ "%.2f"|format(vat_amount) }}</td>
+              <td class="sv">{{ vat_amount|fmt }}</td>
             </tr>
             <tr class="sum-total-row">
               <td class="sl fw-bold">จำนวนเงินรวมภาษี</td>
-              <td class="sv fw-bold">{{ "%.2f"|format(grand_total) }}</td>
+              <td class="sv fw-bold">{{ grand_total|fmt }}</td>
             </tr>
             {% else %}
             <tr class="sum-total-row">
               <td class="sl fw-bold">ยอดรวมทั้งหมด</td>
-              <td class="sv fw-bold">{{ "%.2f"|format(grand_total) }}</td>
+              <td class="sv fw-bold">{{ grand_total|fmt }}</td>
             </tr>
             {% endif %}
           </table>

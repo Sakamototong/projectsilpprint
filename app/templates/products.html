@@ -56,7 +56,7 @@
                        class="form-control form-control-sm text-end price-input fw-bold"
                        data-id="{{ p.id }}"
                        data-orig="{{ p.price }}"
-                       value="{{ "%.2f"|format(p.price) }}"
+                       value="{{ p.price }}"
                        step="0.01" min="0"
                        style="max-width:110px; margin-left:auto;"
                        oninput="onPriceChange(this)">

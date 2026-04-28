@@ -25,6 +25,27 @@
       <form method="post" action="/web/members/{{ member.id }}/edit">
 
         <div class="mb-3">
+          <label class="form-label fw-bold"><i class="bi bi-building me-1 text-primary"></i>ชื่อบริษัท / องค์กร</label>
+          <input type="text" name="company_name" class="form-control form-control-lg"
+                 value="{{ member.company_name or '' }}" placeholder="ชื่อบริษัท / หน่วยงาน">
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label fw-bold">ผู้ขับ / ผู้ติดต่อ</label>
+            <input type="text" name="driver_name" class="form-control"
+                   value="{{ member.driver_name or '' }}" placeholder="ชื่อคนขับ / ผู้ติดต่อ">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label fw-bold">ทะเบียนรถ</label>
+            <input type="text" name="license_plate" class="form-control font-monospace"
+                   value="{{ member.license_plate or '' }}" placeholder="เช่น กข-1234">
+          </div>
+        </div>
+
+        <hr class="my-3">
+
+        <div class="mb-3">
           <label class="form-label fw-bold">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
           <input type="text" name="name" class="form-control"
                  value="{{ member.name }}" required>

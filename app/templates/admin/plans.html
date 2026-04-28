@@ -21,10 +21,10 @@
           {% if not p.is_active %}<span class="badge bg-secondary">ปิดใช้</span>{% endif %}
         </div>
         <div class="mb-2">
-          <span class="fs-5 fw-bold text-primary">฿{{ "%.0f"|format(p.price_monthly) }}</span>
+          <span class="fs-5 fw-bold text-primary">฿{{ p.price_monthly|fmt0 }}</span>
           <span class="text-muted small">/เดือน</span>
           <span class="text-muted mx-1">·</span>
-          <span class="fw-semibold">฿{{ "%.0f"|format(p.price_yearly) }}</span>
+          <span class="fw-semibold">฿{{ p.price_yearly|fmt0 }}</span>
           <span class="text-muted small">/ปี</span>
         </div>
         <ul class="list-unstyled small text-muted mb-3">
