@@ -170,12 +170,20 @@
     <div class="inv-head-accent"></div>
     <div class="inv-head-body">
       <div class="inv-head-store">
-        <div class="s-name">{{ store_name }}</div>
-        {% if store.address %}<div class="s-info">{{ store.address }}</div>{% endif %}
-        {% if store.tax_id  %}<div class="s-info">เลขประจำตัวผู้เสียภาษี {{ store.tax_id }}</div>{% endif %}
-        <div class="s-info-row">
-          {% if store.phone %}<span>โทร. {{ store.phone }}</span>{% endif %}
-          {% if store.email %}<span>{{ store.email }}</span>{% endif %}
+        {% if store.logo_base64 %}
+        <img src="{{ store.logo_base64 }}" alt="logo" class="store-logo-img">
+        {% endif %}
+        <div>
+          <div class="s-name">{{ store_name }}</div>
+          {% if store.receipt_header_text %}
+          <div class="s-info" style="font-style:italic;">{{ store.receipt_header_text }}</div>
+          {% endif %}
+          {% if store.address %}<div class="s-info">{{ store.address }}</div>{% endif %}
+          {% if store.tax_id  %}<div class="s-info">เลขประจำตัวผู้เสียภาษี {{ store.tax_id }}</div>{% endif %}
+          <div class="s-info-row">
+            {% if store.phone %}<span>โทร. {{ store.phone }}</span>{% endif %}
+            {% if store.email %}<span>{{ store.email }}</span>{% endif %}
+          </div>
         </div>
       </div>
       <div class="inv-head-title">
@@ -248,8 +256,14 @@
   <div class="inv-bot">
     <div class="inv-notes">
       <div class="eo-hd">หมายเหตุ</div>
+      {% if store.receipt_footer_text %}
+        {% for line in store.receipt_footer_text.splitlines() %}
+        {% if line.strip() %}<div class="eo-note">{{ line }}</div>{% endif %}
+        {% endfor %}
+      {% else %}
       <div class="eo-note">- ให้รับสินค้าตามใบส่งสินค้าฉบับนี้ ครบถ้วนเรียบร้อยแล้ว หากมีการเสียหายโปรดแจ้งภายใน 7 วัน</div>
       <div class="eo-note">- ตรวจรับสินค้าถูกต้องและยอมรับตามข้อตกลงตามใบส่งสินค้านี้</div>
+      {% endif %}
       {% if payload.get('note') %}<div class="eo-note">หมายเหตุ: {{ payload.get('note') }}</div>{% endif %}
       <div class="amt-words"><strong>{{ amount_text }}</strong></div>
     </div>
@@ -327,7 +341,7 @@ a, a:hover { color: #000 !important; text-decoration: none !important; }
 /* ═══ TOP ACCENT BAR ═════════════════════════════ */
 .inv-head-accent {
   height: 5px;
-  background: linear-gradient(90deg, #1e3a5f 0%, #2e6da4 100%);
+  background: {{ store.receipt_color or '#1e3a5f' }};
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -337,7 +351,8 @@ a, a:hover { color: #000 !important; text-decoration: none !important; }
   justify-content: space-between;
   padding: 4mm 6mm 3mm;
 }
-.inv-head-store { flex: 1; }
+.inv-head-store { flex: 1; display: flex; gap: 8px; align-items: flex-start; }
+.store-logo-img { height: 52px; width: 52px; object-fit: contain; border-radius: 4px; flex-shrink: 0; border: 1px solid #ddd; }
 .s-name {
   font-size: 14pt;
   font-weight: 900;
@@ -354,8 +369,8 @@ a, a:hover { color: #000 !important; text-decoration: none !important; }
 /* ORIGINAL = navy box; COPY = grey box */
 .is-orig .t-box {
   display: inline-block;
-  background: #1e3a5f !important;
-  border: 2px solid #1e3a5f;
+  background: {{ store.receipt_color or '#1e3a5f' }} !important;
+  border: 2px solid {{ store.receipt_color or '#1e3a5f' }};
   padding: 5px 14px;
   text-align: center;
   -webkit-print-color-adjust: exact;
@@ -413,7 +428,7 @@ a, a:hover { color: #000 !important; text-decoration: none !important; }
 /* ═══ ITEMS TABLE ════════════════════════════════ */
 .items-t { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
 .items-t thead th {
-  background: #1e3a5f !important;
+  background: {{ store.receipt_color or '#1e3a5f' }} !important;
   color: #fff !important;
   border: 1px solid #16304e;
   padding: 3px 4px;
@@ -472,13 +487,13 @@ a, a:hover { color: #000 !important; text-decoration: none !important; }
 }
 .sv { font-size: 8pt; text-align: right; border-bottom: 1px solid #ddd; padding: 4px 7px; min-width: 65px; }
 .sum-grand .sk {
-  background: #1e3a5f !important;
+  background: {{ store.receipt_color or '#1e3a5f' }} !important;
   color: #fff !important;
   font-size: 8pt; font-weight: 800;
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
 }
 .sum-grand .sv {
-  background: #1e3a5f !important;
+  background: {{ store.receipt_color or '#1e3a5f' }} !important;
   color: #fff !important;
   font-size: 10pt; font-weight: 800;
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
@@ -528,10 +543,10 @@ a, a:hover { color: #000 !important; text-decoration: none !important; }
   .container-fluid { padding: 0 !important; margin: 0 !important; }
   .inv-sheet     { display: block !important; width: 100%; margin: 0; }
   .inv-copy      { width: 100%; box-shadow: none; border: 1px solid #bbb; }
-  .is-orig .t-box { background: #1e3a5f !important; }
+  .is-orig .t-box { background: {{ store.receipt_color or '#1e3a5f' }} !important; }
   .is-copy .t-box { background: #e2e2e2 !important; }
-  .items-t thead th { background: #1e3a5f !important; }
-  .sum-grand .sk, .sum-grand .sv { background: #1e3a5f !important; }
+  .items-t thead th { background: {{ store.receipt_color or '#1e3a5f' }} !important; }
+  .sum-grand .sk, .sum-grand .sv { background: {{ store.receipt_color or '#1e3a5f' }} !important; }
   .cut-line      { display: flex !important; }
 }
 </style>

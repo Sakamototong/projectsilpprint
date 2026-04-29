@@ -29,6 +29,11 @@ class Store(Base):
     email = Column(String, nullable=True)
     vat_rate = Column(Float, default=7.0)       # % VAT (0 = ไม่มี VAT)
     include_vat = Column(Boolean, default=True) # แสดง VAT ในใบเสร็จ
+    # ปรับแต่งใบเสร็จ
+    logo_base64 = Column(Text, nullable=True)            # รูป logo (data URI)
+    receipt_color = Column(String(7), nullable=True)     # สีหลัก hex เช่น #1a3a6e
+    receipt_header_text = Column(Text, nullable=True)    # ข้อความใต้ชื่อร้าน
+    receipt_footer_text = Column(Text, nullable=True)    # ข้อความหมายเหตุท้ายใบเสร็จ
     # SaaS / approval fields
     business_type = Column(String, nullable=True)          # "fuel_station"/"retail"/"other"
     requested_plan_id = Column(Integer, ForeignKey("subscription_plans.id"), nullable=True)

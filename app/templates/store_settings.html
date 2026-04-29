@@ -14,6 +14,12 @@
   <button type="button" class="btn-close float-end" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
+{% if request.query_params.get('logo_error') %}
+<div class="alert alert-danger py-2">
+  <i class="bi bi-exclamation-triangle-fill me-2"></i>อัปโหลด logo ไม่สำเร็จ: ไฟล์ต้องเป็นรูปภาพ (PNG/JPG/GIF/WebP) ขนาดไม่เกิน 500 KB
+  <button type="button" class="btn-close float-end" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
 
 <div class="row g-4">
   <!-- ข้อมูลร้านค้า -->
@@ -68,9 +74,59 @@
           </div>
         </div>
 
+        <hr>
+        <h6 class="fw-bold mb-3 text-muted text-uppercase small"><i class="bi bi-palette me-1"></i>ปรับแต่งใบเสร็จ</h6>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">สีหลักของใบเสร็จ</label>
+          <div class="d-flex align-items-center gap-2">
+            <input type="color" name="receipt_color" class="form-control form-control-color"
+                   value="{{ store.receipt_color or '#1a3a6e' }}" style="width:48px;height:34px;">
+            <input type="text" id="colorHex" class="form-control form-control-sm" style="max-width:100px;"
+                   value="{{ store.receipt_color or '#1a3a6e' }}" placeholder="#1a3a6e" maxlength="7">
+            <small class="text-muted">ใช้กับ header bar และตารางในใบเสร็จทุกประเภท</small>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">ข้อความเพิ่มเติมใต้ชื่อร้าน (เช่น tagline / สาขา)</label>
+          <input type="text" name="receipt_header_text" class="form-control form-control-sm"
+                 value="{{ store.receipt_header_text or '' }}" placeholder="เช่น สาขาสยาม · เปิดทุกวัน 8:00–20:00">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">หมายเหตุท้ายใบเสร็จ</label>
+          <textarea name="receipt_footer_text" class="form-control form-control-sm" rows="3"
+                    placeholder="เช่น ให้รับสินค้าตามใบส่งสินค้าฉบับนี้ ครบถ้วนเรียบร้อยแล้ว...">{{ store.receipt_footer_text or '' }}</textarea>
+          <div class="form-text">แต่ละบรรทัดจะแสดงเป็นข้อความแยกในใบเสร็จ</div>
+        </div>
+
         <button type="submit" class="btn btn-primary w-100">
           <i class="bi bi-save me-1"></i>บันทึกข้อมูลร้าน
         </button>
+      </form>
+
+      {# ── Logo upload (form แยก) ── #}
+      <hr class="mt-4">
+      <h6 class="fw-bold mb-3 text-muted text-uppercase small"><i class="bi bi-image me-1"></i>Logo ร้านค้า</h6>
+      <div class="mb-3 text-center">
+        {% if store.logo_base64 %}
+        <img src="{{ store.logo_base64 }}" alt="logo" class="rounded mb-2"
+             style="max-height:80px;max-width:200px;object-fit:contain;border:1px solid #dee2e6;padding:4px;">
+        {% else %}
+        <div class="rounded-circle bg-secondary text-white d-inline-flex align-items-center justify-content-center mb-2"
+             style="width:64px;height:64px;font-size:24pt;font-weight:900;">{{ store.name[0]|upper }}</div>
+        <div class="text-muted small">ยังไม่มี logo (ใช้ตัวอักษรแทน)</div>
+        {% endif %}
+      </div>
+      <form method="post" action="/web/settings/logo" enctype="multipart/form-data">
+        <div class="input-group input-group-sm mb-2">
+          <input type="file" name="logo" class="form-control" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml">
+          <button type="submit" class="btn btn-outline-primary">อัปโหลด</button>
+        </div>
+        <div class="form-text mb-2">PNG / JPG / WebP / SVG · ไม่เกิน 500 KB</div>
+        {% if store.logo_base64 %}
+        <button type="submit" name="remove_logo" value="1" class="btn btn-outline-danger btn-sm w-100">
+          <i class="bi bi-trash me-1"></i>ลบ logo ออก
+        </button>
+        {% endif %}
       </form>
 
       <hr class="mt-4">
@@ -81,4 +137,13 @@
   </div>
 </div>
 
+<script>
+/* sync color picker ↔ hex text input */
+const colorInput = document.querySelector('input[name="receipt_color"]');
+const hexInput   = document.getElementById('colorHex');
+colorInput.addEventListener('input', () => { hexInput.value = colorInput.value; });
+hexInput.addEventListener('input', () => {
+  if (/^#[0-9a-fA-F]{6}$/.test(hexInput.value)) colorInput.value = hexInput.value;
+});
+</script>
 {% endblock %}

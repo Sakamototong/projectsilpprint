@@ -5,7 +5,8 @@ import io
 from datetime import datetime, timezone as _tz, date as _date
 from collections import defaultdict
 
-from fastapi import APIRouter, Request, Form, Depends
+import base64
+from fastapi import APIRouter, Request, Form, Depends, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -1201,6 +1202,9 @@ def settings_profile_post(
     email: str = Form(""),
     vat_rate: float = Form(7.0),
     include_vat: str = Form(""),
+    receipt_color: str = Form(""),
+    receipt_header_text: str = Form(""),
+    receipt_footer_text: str = Form(""),
     db: Session = Depends(get_db),
 ):
     ctx = _get_user_ctx(request, db)
@@ -1216,6 +1220,36 @@ def settings_profile_post(
     store.email = email or None
     store.vat_rate = vat_rate
     store.include_vat = bool(include_vat)
+    store.receipt_color = receipt_color.strip() or None
+    store.receipt_header_text = receipt_header_text.strip() or None
+    store.receipt_footer_text = receipt_footer_text.strip() or None
+    db.commit()
+    return RedirectResponse("/web/settings?saved=1", status_code=302)
+
+
+@router.post("/settings/logo")
+async def settings_logo_post(
+    request: Request,
+    logo: UploadFile = File(None),
+    remove_logo: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    if not _is_admin_or_owner(ctx):
+        return RedirectResponse("/web/members", status_code=302)
+    store = ctx["store"]
+    if remove_logo:
+        store.logo_base64 = None
+    elif logo and logo.filename:
+        content = await logo.read()
+        if len(content) > 500 * 1024:
+            return RedirectResponse("/web/settings?logo_error=1", status_code=302)
+        mime = logo.content_type or "image/png"
+        if mime not in ("image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"):
+            return RedirectResponse("/web/settings?logo_error=1", status_code=302)
+        store.logo_base64 = f"data:{mime};base64,{base64.b64encode(content).decode()}"
     db.commit()
     return RedirectResponse("/web/settings?saved=1", status_code=302)
 

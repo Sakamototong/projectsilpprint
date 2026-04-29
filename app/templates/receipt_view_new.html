@@ -61,10 +61,17 @@
           <table>
             <tr>
               <td class="logo-cell">
+                {% if store.logo_base64 %}
+                <img src="{{ store.logo_base64 }}" alt="logo" class="store-logo-img">
+                {% else %}
                 <div class="store-logo">{{ store_name[0]|upper }}</div>
+                {% endif %}
               </td>
               <td class="store-info-cell">
                 <div class="store-name">{{ store_name }}</div>
+                {% if store.receipt_header_text %}
+                <div class="si-line" style="font-style:italic;color:#555;">{{ store.receipt_header_text }}</div>
+                {% endif %}
                 {% if store.address %}
                 <div class="si-line">{{ store.address }}</div>
                 {% endif %}
@@ -208,8 +215,14 @@
     </table>
 
     <div class="rc-note">
-      กรุณาตรวจสอบใบกำกับภาษี หากเกิน 7 วัน นับจากวันที่ออกใบกำกับภาษี
-      ทาง{{ store_name }}ถือว่าใบกำกับภาษีฉบับนี้ถูกต้องแล้ว
+      {% if store.receipt_footer_text %}
+        {% for line in store.receipt_footer_text.splitlines() %}
+        {% if line.strip() %}<div>{{ line }}</div>{% endif %}
+        {% endfor %}
+      {% else %}
+      <div>- ให้รับสินค้าตามใบส่งสินค้าฉบับนี้ ครบถ้วนเรียบร้อยแล้ว หากมีการเสียหายโปรดแจ้งภายใน 7 วัน</div>
+      <div>- ตรวจรับสินค้าถูกต้องและยอมรับตามข้อตกลงตามใบส่งสินค้านี้</div>
+      {% endif %}
     </div>
   </div>{# end .rc #}
 
@@ -249,16 +262,20 @@
 .logo-cell { width: 58px; vertical-align: middle; padding-right: 8px; }
 .store-logo {
   width: 52px; height: 52px; border-radius: 50%;
-  background: #1a3a6e; color: #fff;
+  background: {{ store.receipt_color or '#1a3a6e' }}; color: #fff;
   font-size: 22pt; font-weight: 900;
   display: flex; align-items: center; justify-content: center;
   border: 3px solid #c8a427;
+}
+.store-logo-img {
+  width: 52px; height: 52px; border-radius: 6px;
+  object-fit: contain; border: 1px solid #ddd;
 }
 .store-info-cell { vertical-align: top; }
 .store-name { font-size: 12pt; font-weight: 700; margin-bottom: 1px; }
 .si-line    { font-size: 8.5pt; line-height: 1.45; color: #222; }
 
-.doc-title  { font-size: 12pt; font-weight: 700; color: #1a3a6e; margin-bottom: 3px; }
+.doc-title  { font-size: 12pt; font-weight: 700; color: {{ store.receipt_color or '#1a3a6e' }}; margin-bottom: 3px; }
 .doc-meta   { border-collapse: collapse; margin-left: auto; }
 .dm-label   { font-size: 9pt; padding-right: 6px; color: #555; }
 .dm-value   { font-size: 9pt; }
@@ -279,7 +296,7 @@
 /* ── items table ────────────────────────────────── */
 .items-table { border-collapse: collapse; font-size: 9pt; margin-bottom: 3px; }
 .items-table th {
-  background: #1a3a6e; color: #fff;
+  background: {{ store.receipt_color or '#1a3a6e' }}; color: #fff;
   padding: 2px 4px; border: 1px solid #0e2857;
   font-weight: 600;
 }
