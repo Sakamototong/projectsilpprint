@@ -32,6 +32,7 @@ class Store(Base):
     # ปรับแต่งใบเสร็จ
     logo_base64 = Column(Text, nullable=True)            # รูป logo (data URI)
     receipt_color = Column(String(7), nullable=True)     # สีหลัก hex เช่น #1a3a6e
+    cash_receipt_color = Column(String(7), nullable=True) # สีบิลเงินสด hex เช่น #166534
     receipt_header_text = Column(Text, nullable=True)    # ข้อความใต้ชื่อร้าน
     receipt_footer_text = Column(Text, nullable=True)    # ข้อความหมายเหตุท้ายใบเสร็จ
     # SaaS / approval fields

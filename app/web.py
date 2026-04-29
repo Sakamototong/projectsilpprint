@@ -1184,6 +1184,74 @@ def billing_profiles_page(request: Request, member_id: int, db: Session = Depend
     })
 
 
+@router.post("/members/{member_id}/update-company")
+def update_company_info(
+    request: Request, member_id: int,
+    company_name: str = Form(""),
+    tax_id: str = Form(""),
+    address: str = Form(""),
+    phone: str = Form(""),
+    email: str = Form(""),
+    set_default: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    member = db.query(Member).filter(Member.id == member_id, Member.store_id == store.id, Member.member_type == "company").first()
+    if not member:
+        return RedirectResponse("/web/members", status_code=302)
+    if company_name.strip():
+        member.company_name = company_name.strip()
+    member.tax_id = tax_id.strip() or None
+    member.address = address.strip() or None
+    member.phone = phone.strip() or None
+    member.email = email.strip() or None
+    if set_default:
+        db.query(BillingProfile).filter(BillingProfile.member_id == member_id).update({"is_default": False})
+    db.commit()
+    return RedirectResponse(f"/web/members/{member_id}", status_code=302)
+
+
+@router.post("/members/{member_id}/set-company-default")
+def set_company_default(
+    request: Request, member_id: int,
+    db: Session = Depends(get_db),
+):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    member = db.query(Member).filter(Member.id == member_id, Member.store_id == store.id).first()
+    if not member:
+        return RedirectResponse("/web/members", status_code=302)
+    # clear all billing profile defaults so member's own data becomes implicit default
+    db.query(BillingProfile).filter(BillingProfile.member_id == member_id).update({"is_default": False})
+    db.commit()
+    return RedirectResponse(f"/web/members/{member_id}", status_code=302)
+
+
+@router.post("/members/{member_id}/clear-company-info")
+def clear_company_info(
+    request: Request, member_id: int,
+    db: Session = Depends(get_db),
+):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    member = db.query(Member).filter(Member.id == member_id, Member.store_id == store.id, Member.member_type == "company").first()
+    if not member:
+        return RedirectResponse("/web/members", status_code=302)
+    member.tax_id = None
+    member.address = None
+    member.phone = None
+    member.email = None
+    db.commit()
+    return RedirectResponse(f"/web/members/{member_id}", status_code=302)
+
+
 @router.post("/members/{member_id}/billing-profiles")
 def billing_profiles_post(
     request: Request, member_id: int,
@@ -1296,6 +1364,7 @@ def settings_profile_post(
     vat_rate: float = Form(7.0),
     include_vat: str = Form(""),
     receipt_color: str = Form(""),
+    cash_receipt_color: str = Form(""),
     receipt_header_text: str = Form(""),
     receipt_footer_text: str = Form(""),
     db: Session = Depends(get_db),
@@ -1314,6 +1383,7 @@ def settings_profile_post(
     store.vat_rate = vat_rate
     store.include_vat = bool(include_vat)
     store.receipt_color = receipt_color.strip() or None
+    store.cash_receipt_color = cash_receipt_color.strip() or None
     store.receipt_header_text = receipt_header_text.strip() or None
     store.receipt_footer_text = receipt_footer_text.strip() or None
     db.commit()

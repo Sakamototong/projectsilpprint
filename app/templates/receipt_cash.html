@@ -88,7 +88,7 @@
 <div class="inv-copy {{ 'is-orig' if copy_type == 'original' else 'is-copy' }}">
 
   <div class="inv-head">
-      <div class="inv-head-accent" style="background:{{ store.receipt_color or '#166534' }};-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
+      <div class="inv-head-accent" style="background:{{ store.cash_receipt_color or '#166534' }};-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
     <div class="inv-head-body">
       <div class="inv-head-store">
         <div class="s-name">{{ store_name }}</div>
@@ -233,8 +233,8 @@ a, a:hover { color: #000 !important; text-decoration: none !important; }
 .s-info-row { display: flex; gap: 14px; font-size: 7.5pt; margin-top: 1px; }
 .inv-head-title { text-align: right; min-width: 140px; }
 .t-docset { font-size: 6pt; letter-spacing: 0.3px; margin-bottom: 5px; }
-.is-orig .t-box { display: inline-block; background: {{ store.receipt_color or '#166534' }} !important;
-  border: 2px solid {{ store.receipt_color or '#166534' }}; padding: 5px 14px; text-align: center;
+.is-orig .t-box { display: inline-block; background: {{ store.cash_receipt_color or '#166534' }} !important;
+  border: 2px solid {{ store.cash_receipt_color or '#166534' }}; padding: 5px 14px; text-align: center;
   -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .is-orig .t-th, .is-orig .t-en { color: #fff !important; }
 .is-copy .t-box { display: inline-block; background: #e2e2e2 !important;
@@ -257,7 +257,7 @@ a, a:hover { color: #000 !important; text-decoration: none !important; }
   -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .mv { font-size: 7.5pt; padding: 3px 6px; border-bottom: 1px solid #eee; white-space: nowrap; }
 .items-t { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
-.items-t thead th { background: {{ store.receipt_color or '#166534' }} !important; color: #fff !important;
+.items-t thead th { background: {{ store.cash_receipt_color or '#166534' }} !important; color: #fff !important;
   border: 1px solid #0f4622; padding: 3px 4px; text-align: center;
   font-size: 7pt; font-weight: 700; line-height: 1.3;
   -webkit-print-color-adjust: exact; print-color-adjust: exact; }

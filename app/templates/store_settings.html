@@ -77,13 +77,23 @@
         <hr>
         <h6 class="fw-bold mb-3 text-muted text-uppercase small"><i class="bi bi-palette me-1"></i>ปรับแต่งใบเสร็จ</h6>
         <div class="mb-3">
-          <label class="form-label small fw-bold">สีหลักของใบเสร็จ</label>
+          <label class="form-label small fw-bold">สีหลักของใบเสร็จ (VAT / ใบกำกับภาษี)</label>
           <div class="d-flex align-items-center gap-2">
-            <input type="color" name="receipt_color" class="form-control form-control-color"
+            <input type="color" name="receipt_color" id="colorPicker" class="form-control form-control-color"
                    value="{{ store.receipt_color or '#1a3a6e' }}" style="width:48px;height:34px;">
             <input type="text" id="colorHex" class="form-control form-control-sm" style="max-width:100px;"
                    value="{{ store.receipt_color or '#1a3a6e' }}" placeholder="#1a3a6e" maxlength="7">
-            <small class="text-muted">ใช้กับ header bar และตารางในใบเสร็จทุกประเภท</small>
+            <small class="text-muted">ใช้กับ header bar และตารางในใบกำกับภาษี</small>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">สีหลักของบิลเงินสด</label>
+          <div class="d-flex align-items-center gap-2">
+            <input type="color" name="cash_receipt_color" id="cashColorPicker" class="form-control form-control-color"
+                   value="{{ store.cash_receipt_color or '#166534' }}" style="width:48px;height:34px;">
+            <input type="text" id="cashColorHex" class="form-control form-control-sm" style="max-width:100px;"
+                   value="{{ store.cash_receipt_color or '#166534' }}" placeholder="#166534" maxlength="7">
+            <small class="text-muted">ใช้กับ header bar และตารางในบิลเงินสด</small>
           </div>
         </div>
         <div class="mb-3">
@@ -139,11 +149,18 @@
 
 <script>
 /* sync color picker ↔ hex text input */
-const colorInput = document.querySelector('input[name="receipt_color"]');
+const colorInput = document.getElementById('colorPicker');
 const hexInput   = document.getElementById('colorHex');
 colorInput.addEventListener('input', () => { hexInput.value = colorInput.value; });
 hexInput.addEventListener('input', () => {
   if (/^#[0-9a-fA-F]{6}$/.test(hexInput.value)) colorInput.value = hexInput.value;
+});
+
+const cashColorInput = document.getElementById('cashColorPicker');
+const cashHexInput   = document.getElementById('cashColorHex');
+cashColorInput.addEventListener('input', () => { cashHexInput.value = cashColorInput.value; });
+cashHexInput.addEventListener('input', () => {
+  if (/^#[0-9a-fA-F]{6}$/.test(cashHexInput.value)) cashColorInput.value = cashHexInput.value;
 });
 </script>
 {% endblock %}

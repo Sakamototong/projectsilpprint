@@ -277,8 +277,49 @@
   </div>
 
   <!-- รายการที่อยู่ -->
-  {% if billing_profiles %}
+  {% if member.member_type == 'company' or billing_profiles %}
   <div class="row g-3">
+    {% if member.member_type == 'company' %}
+    {% set any_bp_default = billing_profiles | selectattr('is_default') | list | length > 0 %}
+    <div class="col-md-6">
+      <div class="card h-100 border-warning">
+        <div class="card-body py-3 px-3">
+          <div class="d-flex justify-content-between align-items-start mb-1">
+            <div>
+              <i class="bi bi-building-fill text-warning me-1"></i>
+              <span class="fw-bold small">{{ member.company_name or member.name }}</span>
+              <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem;">ข้อมูลบริษัท</span>
+              {% if not any_bp_default %}
+              <span class="badge bg-primary ms-1" style="font-size:.65rem;">หลัก</span>
+              {% endif %}
+            </div>
+            <div class="d-flex gap-1 ms-2">
+              <button class="btn btn-outline-warning btn-sm py-0 px-1" style="font-size:.75rem;"
+                onclick='mdOpenCompany({{ {"company_name": member.company_name or "", "tax_id": member.tax_id or "", "phone": member.phone or "", "address": member.address or "", "email": member.email or ""}|tojson }})'>
+                <i class="bi bi-pencil-square"></i>
+              </button>
+              {% if any_bp_default %}
+              <form method="post" action="/web/members/{{ member.id }}/set-company-default">
+                <button class="btn btn-outline-primary btn-sm py-0 px-1" style="font-size:.75rem;" title="ตั้งเป็นหลัก">
+                  <i class="bi bi-star"></i>
+                </button>
+              </form>
+              {% endif %}
+              <form method="post" action="/web/members/{{ member.id }}/clear-company-info"
+                    onsubmit="return confirm('ล้างข้อมูลบริษัท (ที่อยู่, เลขภาษี) ใช่หรือไม่?')">
+                <button class="btn btn-outline-danger btn-sm py-0 px-1" style="font-size:.75rem;" title="ล้างข้อมูลบริษัท">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </div>
+          {% if member.tax_id %}<p class="mb-1 small text-muted">เลขภาษี: {{ member.tax_id }}</p>{% endif %}
+          {% if member.address %}<p class="mb-1 small text-muted" style="white-space:pre-wrap;">{{ member.address }}</p>{% endif %}
+          {% if member.phone %}<p class="mb-0 small text-muted"><i class="bi bi-telephone me-1"></i>{{ member.phone }}</p>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
     {% for bp in billing_profiles %}
     <div class="col-md-6">
       <div class="card h-100 border{% if bp.is_default %}-primary{% endif %}">
@@ -315,6 +356,63 @@
     <p class="mb-0">ยังไม่มีที่อยู่สำหรับออกบิล</p>
   </div>
   {% endif %}
+</div>
+
+{# ── Edit Company Modal ── #}
+<div class="modal fade" id="mdEditCompanyModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-3">
+        <h6 class="modal-title fw-bold">
+          <i class="bi bi-building-fill me-2 text-warning"></i>แก้ไขข้อมูลบริษัท
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="/web/members/{{ member.id }}/update-company">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label small fw-bold">ชื่อบริษัท / นิติบุคคล <span class="text-danger">*</span></label>
+            <input type="text" name="company_name" id="mc-company" class="form-control form-control-sm" required>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label small fw-bold">เลขผู้เสียภาษี</label>
+              <input type="text" name="tax_id" id="mc-tax" class="form-control form-control-sm"
+                     placeholder="X-XXXX-XXXXX-XX-X" maxlength="17" inputmode="numeric">
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-bold">เบอร์โทร</label>
+              <input type="text" name="phone" id="mc-phone" class="form-control form-control-sm"
+                     placeholder="0XX-XXX-XXXX" maxlength="12" inputmode="numeric">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold">ที่อยู่</label>
+            <textarea name="address" id="mc-address" class="form-control form-control-sm" rows="3"
+                      placeholder="บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์"></textarea>
+          </div>
+          <div class="row g-2">
+            <div class="col-7">
+              <label class="form-label small fw-bold">อีเมล</label>
+              <input type="email" name="email" id="mc-email" class="form-control form-control-sm" placeholder="email@example.com">
+            </div>
+            <div class="col-5 d-flex align-items-end pb-1">
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input" name="set_default" value="1" id="mc-is-default">
+                <label class="form-check-label small" for="mc-is-default">ตั้งเป็นที่อยู่หลัก</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="submit" class="btn btn-warning btn-sm">
+            <i class="bi bi-save me-1"></i>บันทึกการแก้ไข
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 {# ── Edit Billing Profile Modal ── #}
@@ -405,6 +503,23 @@
   var addForm    = document.getElementById('md-add-form');
   addCompany.addEventListener('input', function(){ document.getElementById('md-add-label').value=this.value; });
   addForm.addEventListener('submit', function(){ document.getElementById('md-add-label').value=addCompany.value; });
+
+  // company modal
+  window.mdOpenCompany = function(data) {
+    document.getElementById('mc-company').value = data.company_name || '';
+    document.getElementById('mc-tax').value     = fmtTax(data.tax_id || '');
+    document.getElementById('mc-phone').value   = fmtPhone(data.phone || '');
+    document.getElementById('mc-address').value = data.address || '';
+    document.getElementById('mc-email').value   = data.email || '';
+    document.getElementById('mc-is-default').checked = false;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('mdEditCompanyModal')).show();
+  };
+  ['mc-tax'].forEach(function(id) {
+    document.getElementById(id).addEventListener('input', function(){ this.value=fmtTax(this.value); });
+  });
+  ['mc-phone'].forEach(function(id) {
+    document.getElementById(id).addEventListener('input', function(){ this.value=fmtPhone(this.value); });
+  });
 
   // edit modal — lazy init so Bootstrap is guaranteed loaded on first click
   window.mdOpenEdit = function(data) {
