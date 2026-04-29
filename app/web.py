@@ -2310,6 +2310,9 @@ def vat_bill_page(request: Request, db: Session = Depends(get_db)):
             "value": f"mem_{m.id}",
             "company_name": display,
             "tax_id": m.tax_id,
+            "address": m.address or "",
+            "phone": m.phone or "",
+            "email": m.email or "",
         })
     # billing_profiles ที่มีอยู่เดิม (ไม่ซ้ำชื่อ)
     member_ids = db.query(Member.id).filter(Member.store_id == store.id).scalar_subquery()
@@ -2330,6 +2333,9 @@ def vat_bill_page(request: Request, db: Session = Depends(get_db)):
             "value": f"bp_{bp.id}",
             "company_name": bp.company_name,
             "tax_id": bp.tax_id,
+            "address": bp.address or "",
+            "phone": bp.phone or "",
+            "email": getattr(bp, "email", "") or "",
         })
     company_choices.sort(key=lambda x: (x["company_name"] or "").lower())
 
@@ -2358,6 +2364,9 @@ def vat_bill_post(
     new_company_phone: str = Form(""),
     new_company_email: str = Form(""),
     new_company_save: str = Form(""),
+    override_address: str = Form(""),
+    override_phone: str = Form(""),
+    override_save: str = Form(""),
     db: Session = Depends(get_db),
 ):
     ctx = _get_user_ctx(request, db)
@@ -2466,6 +2475,28 @@ def vat_bill_post(
                 }
         except (ValueError, Exception):
             pass
+
+    # Apply override address/phone for existing companies
+    if bp_snapshot is not None and company_id != "__new__":
+        if override_address.strip():
+            bp_snapshot["address"] = override_address.strip()
+        if override_phone.strip():
+            bp_snapshot["phone"] = override_phone.strip()
+        # Save overridden address back to Member record if requested
+        if override_save and company_id.startswith("mem_"):
+            try:
+                m_upd = db.query(Member).filter(
+                    Member.id == int(company_id[4:]),
+                    Member.store_id == store.id,
+                ).first()
+                if m_upd:
+                    if override_address.strip():
+                        m_upd.address = override_address.strip()
+                    if override_phone.strip():
+                        m_upd.phone = override_phone.strip()
+                    db.flush()
+            except (ValueError, Exception):
+                pass
 
     clean_plate = license_plate.strip().upper() if license_plate and license_plate.strip() else None
     clean_driver = driver_name.strip() if driver_name and driver_name.strip() else None

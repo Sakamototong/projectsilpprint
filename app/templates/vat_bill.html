@@ -58,7 +58,8 @@
             </button>
             {% for c in company_choices %}
             <button type="button" class="list-group-item list-group-item-action co-opt py-1 small"
-                    data-value="{{ c.value }}" data-label="{{ c.company_name }}">
+                    data-value="{{ c.value }}" data-label="{{ c.company_name }}"
+                    data-address="{{ c.address }}" data-phone="{{ c.phone }}" data-email="{{ c.email }}">
               {{ c.company_name }}
               {% if c.tax_id %}<span class="text-muted ms-1">({{ c.tax_id }})</span>{% endif %}
             </button>
@@ -104,6 +105,25 @@
             <input type="checkbox" class="form-check-input" name="new_company_save" value="1"
                    id="new_company_save" checked>
             <label class="form-check-label small" for="new_company_save">บันทึกบริษัทนี้ไว้ใช้ครั้งหน้า</label>
+          </div>
+        </div>
+
+        {# ── แก้ไขที่อยู่สำหรับบริษัทที่มีอยู่แล้ว ── #}
+        <div id="existingCoPanel" class="card border-info border-opacity-50 p-3 mb-3" style="display:none;">
+          <p class="small fw-bold text-info mb-2"><i class="bi bi-pencil-square me-1"></i>ที่อยู่สำหรับบิลนี้ <span class="fw-normal text-muted">(แก้ไขได้เฉพาะบิลนี้)</span></p>
+          <div class="mb-2">
+            <label class="form-label small fw-bold mb-1">ที่อยู่</label>
+            <textarea name="override_address" id="overrideAddressTA" class="form-control form-control-sm" rows="2"
+                      placeholder="บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์"></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-bold mb-1">เบอร์โทร</label>
+            <input type="text" name="override_phone" id="overridePhoneInput" class="form-control form-control-sm"
+                   placeholder="XXX-XXX-XXXX" maxlength="12" inputmode="numeric">
+          </div>
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input" name="override_save" value="1" id="override_save">
+            <label class="form-check-label small" for="override_save">บันทึกที่อยู่นี้ไปยังบริษัทด้วย</label>
           </div>
         </div>
 
@@ -310,23 +330,41 @@ document.querySelectorAll('.quick-add').forEach(btn => {
     if (!this.value.trim()) {
       hidden.value = '';
       document.getElementById('newCoPanel').style.display = 'none';
+      document.getElementById('existingCoPanel').style.display = 'none';
     }
   });
+
+  function showExistingPanel(opt) {
+    var addr  = opt.dataset.address  || '';
+    var phone = opt.dataset.phone    || '';
+    document.getElementById('overrideAddressTA').value   = addr;
+    document.getElementById('overridePhoneInput').value  = phone;
+    document.getElementById('override_save').checked     = false;
+    document.getElementById('existingCoPanel').style.display = 'block';
+    document.getElementById('newCoPanel').style.display = 'none';
+  }
 
   opts.forEach(function(opt) {
     opt.addEventListener('mousedown', function(e) {
       e.preventDefault(); // prevent blur before click registers
       var v = this.dataset.value;
       hidden.value = v;
-      var panel = document.getElementById('newCoPanel');
+      var newPanel = document.getElementById('newCoPanel');
+      var exPanel  = document.getElementById('existingCoPanel');
       if (v === '__new__') {
         searchInput.value = '';
-        panel.style.display = 'block';
+        newPanel.style.display = 'block';
+        exPanel.style.display  = 'none';
         closeDrop();
         document.getElementById('new_company_name').focus();
+      } else if (v === '') {
+        searchInput.value = '';
+        newPanel.style.display = 'none';
+        exPanel.style.display  = 'none';
+        closeDrop();
       } else {
-        searchInput.value = v === '' ? '' : this.dataset.label;
-        panel.style.display = 'none';
+        searchInput.value = this.dataset.label;
+        showExistingPanel(this);
         closeDrop();
       }
     });
@@ -358,6 +396,7 @@ document.querySelectorAll('.quick-add').forEach(btn => {
   }
   document.getElementById('new_company_tax_id').addEventListener('input', function(){ this.value = fmtTax(this.value); });
   document.getElementById('new_company_phone').addEventListener('input', function(){ this.value = fmtPhone(this.value); });
+  document.getElementById('overridePhoneInput').addEventListener('input', function(){ this.value = fmtPhone(this.value); });
   document.getElementById('licensePlateInput').addEventListener('blur', function(){ this.value = this.value.toUpperCase(); });
 })();
 
