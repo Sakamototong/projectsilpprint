@@ -111,7 +111,7 @@
           <div class="col-sm-6">
             <label class="form-label fw-bold">เบอร์โทรศัพท์</label>
             <input type="tel" name="phone" id="phonePerson" class="form-control"
-                   value="{{ member.phone or '' }}" placeholder="0xx-xxx-xxxx"
+                   value="{{ member.phone or '' }}" placeholder="0XX-XXX-XXXX"
                    {% if member.member_type == 'company' %}disabled{% endif %}>
           </div>
           <div class="col-sm-6">
@@ -204,6 +204,19 @@
 
 {% block scripts %}
 <script>
+// ─── Auto-format helpers ─────────────────────────────────────
+function formatTaxId(v) {
+  const d = v.replace(/\D/g,'').slice(0,13);
+  let o='';
+  for(let i=0;i<d.length;i++){if(i===1||i===5||i===10||i===12)o+='-';o+=d[i];}
+  return o;
+}
+function formatPhone(v) {
+  const d = v.replace(/\D/g,'').slice(0,10);
+  let o='';
+  for(let i=0;i<d.length;i++){if(i===3||i===6)o+='-';o+=d[i];}
+  return o;
+}
 function toggleMemberType(type) {
   const companyBlock  = document.getElementById('companyBlock');
   const personBlock   = document.getElementById('personBlock');
@@ -238,5 +251,24 @@ function toggleMemberType(type) {
     companyInputs.forEach(el => { el.disabled = true; });
   }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+  const checked = document.querySelector('input[name="member_type"]:checked');
+  if (checked) toggleMemberType(checked.value);
+
+  const taxEl  = document.getElementById('inputTaxId');
+  const phComp = document.getElementById('phoneCompany');
+  const phPers = document.getElementById('phonePerson');
+
+  if(taxEl){ taxEl.value=formatTaxId(taxEl.value); taxEl.addEventListener('input',function(){this.value=formatTaxId(this.value);}); }
+  [phComp,phPers].forEach(el=>{ if(!el)return; el.value=formatPhone(el.value); el.addEventListener('input',function(){this.value=formatPhone(this.value);}); });
+
+  const form = document.querySelector('form');
+  if(form) form.addEventListener('submit',function(){
+    if(taxEl&&!taxEl.disabled)  taxEl.value=taxEl.value.replace(/-/g,'');
+    if(phComp&&!phComp.disabled) phComp.value=phComp.value.replace(/-/g,'');
+    if(phPers&&!phPers.disabled) phPers.value=phPers.value.replace(/-/g,'');
+  });
+});
 </script>
 {% endblock %}
