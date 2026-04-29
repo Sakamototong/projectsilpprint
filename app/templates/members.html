@@ -29,10 +29,30 @@
   </a>
 </div>
 
+<!-- Tab กรองประเภท -->
+<ul class="nav nav-pills mb-3 gap-1">
+  <li class="nav-item">
+    <a class="nav-link {% if mtype == 'person' %}active{% endif %}" href="/web/members?mtype=person">
+      <i class="bi bi-person-fill me-1"></i>บุคคล
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if mtype == 'company' %}active{% endif %}" href="/web/members?mtype=company">
+      <i class="bi bi-building-fill me-1"></i>บริษัท
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if mtype == 'all' %}active{% endif %}" href="/web/members?mtype=all">
+      <i class="bi bi-list me-1"></i>ทั้งหมด
+    </a>
+  </li>
+</ul>
+
 <!-- ค้นหา -->
 <div class="card mb-3">
   <div class="card-body py-3">
     <form method="get" action="/web/members" class="row g-2 align-items-end">
+      <input type="hidden" name="mtype" value="{{ mtype }}">
       <div class="col-md-6 col-lg-5">
         <input type="text" name="q" class="form-control"
                placeholder="ค้นหาด้วยชื่อ, เบอร์โทร, รหัสสมาชิก"
@@ -42,7 +62,7 @@
         <button type="submit" class="btn btn-outline-primary">
           <i class="bi bi-search"></i> ค้นหา
         </button>
-        <a href="/web/members" class="btn btn-outline-secondary">ล้าง</a>
+        <a href="/web/members?mtype={{ mtype }}" class="btn btn-outline-secondary">ล้าง</a>
       </div>
     </form>
   </div>
@@ -70,7 +90,14 @@
           <tr>
             <td class="text-muted small">{{ m.id }}</td>
             <td>
-              {% if m.company_name %}
+              {% if m.member_type == 'company' %}
+              <div class="fw-bold">
+                <i class="bi bi-building-fill text-warning me-1 small"></i>{{ m.company_name or m.name }}
+              </div>
+              {% if m.company_name and m.name != m.company_name %}
+              <div class="small text-muted">ผู้ติดต่อ: {{ m.name }}</div>
+              {% endif %}
+              {% elif m.company_name %}
               <div class="fw-bold">{{ m.company_name }}</div>
               <div class="small text-muted">{{ m.name }}</div>
               {% else %}

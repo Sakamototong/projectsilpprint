@@ -201,6 +201,8 @@
   </div>
 
   {# ── CUSTOMER + META ── #}
+  {% set receipt_driver = payload.get('driver_name') %}
+  {% set receipt_plate  = payload.get('license_plate') %}
   <div class="inv-cust-row">
     <div class="inv-cust">
       <div class="c-label">ชื่อลูกค้าและที่อยู่ <span>CUSTOMER'S NAME &amp; ADDRESS</span></div>
@@ -210,6 +212,13 @@
       {% if cust_phone %}<div class="c-info">โทร. {{ cust_phone }}</div>{% endif %}
       {% if member and member.member_code and not bp %}
       <div class="c-info">รหัสสมาชิก: {{ member.member_code }}</div>
+      {% endif %}
+      {% if receipt_driver or receipt_plate %}
+      <div class="c-info">
+        {% if receipt_driver %}<span>คนขับ: {{ receipt_driver }}</span>{% endif %}
+        {% if receipt_driver and receipt_plate %} &nbsp;|&nbsp; {% endif %}
+        {% if receipt_plate %}<span>ทะเบียน: {{ receipt_plate }}</span>{% endif %}
+      </div>
       {% endif %}
     </div>
     <div class="inv-meta">

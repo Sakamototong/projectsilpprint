@@ -21,51 +21,104 @@
 
       <form method="post" action="/web/enroll" class="needs-validation" novalidate>
 
-        <!-- บริษัท / ยานพาหนะ -->
-        <div class="mb-3">
-          <label class="form-label fw-semibold fs-5"><i class="bi bi-building me-1 text-primary"></i>ชื่อบริษัท / องค์กร <span class="text-muted small fw-normal">(ถ้ามี)</span></label>
-          <input type="text" name="company_name" class="form-control form-control-lg" autofocus
-                 placeholder="ชื่อบริษัท / หน่วยงาน"
-                 value="{{ form.company_name if form else '' }}">
+        <!-- ประเภทสมาชิก -->
+        <div class="mb-4">
+          <label class="form-label fw-semibold">ประเภทสมาชิก</label>
+          <div class="d-flex gap-3">
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="member_type" id="mtype_person" value="person"
+                     {% if not form or (form and form.get('member_type','person') == 'person') %}checked{% endif %}
+                     onchange="toggleMemberType('person')">
+              <label class="form-check-label" for="mtype_person">
+                <i class="bi bi-person-fill me-1 text-primary"></i>บุคคลทั่วไป
+              </label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="member_type" id="mtype_company" value="company"
+                     {% if form and form.get('member_type') == 'company' %}checked{% endif %}
+                     onchange="toggleMemberType('company')">
+              <label class="form-check-label" for="mtype_company">
+                <i class="bi bi-building-fill me-1 text-warning"></i>บริษัท / นิติบุคคล
+              </label>
+            </div>
+          </div>
         </div>
 
-        <div class="row g-3 mb-3">
-          <div class="col-md-6">
-            <label class="form-label fw-semibold"><i class="bi bi-person me-1"></i>ชื่อผู้ขับ / ผู้ติดต่อ</label>
-            <input type="text" name="driver_name" class="form-control"
-                   placeholder="ชื่อคนขับ / ผู้ติดต่อ"
-                   value="{{ form.driver_name if form else '' }}">
+        <!-- ส่วนข้อมูลบริษัท (company type) -->
+        <div id="companyBlock" class="card border-warning p-3 mb-3" style="display:none;">
+          <h6 class="fw-bold text-warning mb-3 small"><i class="bi bi-building-fill me-1"></i>ข้อมูลบริษัท</h6>
+          <div class="row g-2">
+            <div class="col-12">
+              <label class="form-label form-label-sm">ชื่อบริษัท / นิติบุคคล <span class="text-danger">*</span></label>
+              <input type="text" name="company_name" id="inputCompanyName" class="form-control form-control-sm"
+                     placeholder="บริษัท / ร้านค้า / หน่วยงาน"
+                     value="{{ form.company_name if form else '' }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label form-label-sm">เลขผู้เสียภาษี</label>
+              <input type="text" name="tax_id" id="inputTaxId" class="form-control form-control-sm"
+                     placeholder="X-XXXX-XXXXX-XX-X" maxlength="17" inputmode="numeric"
+                     value="{{ form.tax_id if form else '' }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label form-label-sm">เบอร์โทรบริษัท</label>
+              <input type="tel" name="phone" id="phoneCompany" class="form-control form-control-sm"
+                     placeholder="XXX-XXX-XXXX"
+                     value="{{ form.phone if form else '' }}">
+            </div>
+            <div class="col-12">
+              <label class="form-label form-label-sm">ที่อยู่</label>
+              <textarea name="address" id="addressCompany" class="form-control form-control-sm" rows="2"
+                        placeholder="บ้านเลขที่ ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด รหัสไปรษณีย์">{{ form.address if form else '' }}</textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label form-label-sm">อีเมล</label>
+              <input type="email" name="email" id="emailCompany" class="form-control form-control-sm"
+                     placeholder="email@example.com"
+                     value="{{ form.email if form else '' }}">
+            </div>
           </div>
-          <div class="col-md-6">
-            <label class="form-label fw-semibold"><i class="bi bi-card-text me-1"></i>ทะเบียนรถ</label>
-            <input type="text" name="license_plate" class="form-control"
-                   placeholder="เช่น กข-1234 หรือ 80-1234"
-                   value="{{ form.license_plate if form else '' }}">
+        </div>
+
+        <!-- ส่วนที่อยู่ (person type) -->
+        <div id="personBlock">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              <i class="bi bi-building me-1 text-primary"></i>ชื่อบริษัท / องค์กร
+              <span class="text-muted small fw-normal">(ถ้ามี)</span>
+            </label>
+            <input type="text" name="company_name" id="inputCompanyNamePerson" class="form-control"
+                   placeholder="ชื่อบริษัท / หน่วยงาน"
+                   value="{{ form.company_name if form else '' }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold"><i class="bi bi-geo-alt me-1"></i>ที่อยู่ <span class="text-muted small fw-normal">(ถ้ามี)</span></label>
+            <textarea name="address" id="addressPerson" class="form-control" rows="2"
+                      placeholder="บ้านเลขที่ ถนน ตำบล อำเภอ จังหวัด รหัสไปรษณีย์">{{ form.address if form else '' }}</textarea>
           </div>
         </div>
 
         <hr class="my-3">
 
         <!-- ข้อมูลหลัก -->
-        <div class="mb-3">
-          <label class="form-label fw-semibold">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
+        <div class="mb-3" id="nameLabelRow">
+          <label class="form-label fw-semibold" id="nameLabel">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
           <input type="text" name="name" class="form-control form-control-lg" required
                  placeholder="กรุณากรอกชื่อ-นามสกุล"
                  value="{{ form.name if form else '' }}">
         </div>
-        </div>
 
-        <div class="row g-3 mb-3">
+        <div class="row g-3 mb-3" id="phoneEmailRow">
           <div class="col-md-6">
             <label class="form-label fw-semibold">เบอร์โทรศัพท์</label>
-            <input type="tel" name="phone" class="form-control"
+            <input type="tel" name="phone" id="phonePerson" class="form-control"
                    placeholder="0812345678" pattern="[0-9]{9,10}"
                    value="{{ form.phone if form else '' }}">
             <div class="form-text">รองรับการค้นหาและระบุตัวตน</div>
           </div>
           <div class="col-md-6">
             <label class="form-label fw-semibold">อีเมล</label>
-            <input type="email" name="email" class="form-control"
+            <input type="email" name="email" id="emailPerson" class="form-control"
                    placeholder="example@email.com"
                    value="{{ form.email if form else '' }}">
           </div>
@@ -113,4 +166,48 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleMemberType(type) {
+  const companyBlock = document.getElementById('companyBlock');
+  const personBlock  = document.getElementById('personBlock');
+  const phoneEmailRow = document.getElementById('phoneEmailRow');
+  const nameLabel    = document.getElementById('nameLabel');
+
+  // fields in company block
+  const companyInputs = companyBlock.querySelectorAll('input,textarea');
+  // fields in person block
+  const personInputs  = personBlock.querySelectorAll('input,textarea');
+  // phone/email in main section
+  const phonePerson  = document.getElementById('phonePerson');
+  const emailPerson  = document.getElementById('emailPerson');
+
+  if (type === 'company') {
+    companyBlock.style.display = '';
+    personBlock.style.display  = 'none';
+    phoneEmailRow.style.display = 'none';
+    nameLabel.innerHTML = 'ชื่อผู้ติดต่อ <span class="text-muted small fw-normal">(ถ้ามี)</span>';
+    // disable person-side duplicates so they don’t submit
+    personInputs.forEach(el => { el.disabled = true; });
+    if (phonePerson) phonePerson.disabled = true;
+    if (emailPerson) emailPerson.disabled = true;
+    companyInputs.forEach(el => { el.disabled = false; });
+  } else {
+    companyBlock.style.display = 'none';
+    personBlock.style.display  = '';
+    phoneEmailRow.style.display = '';
+    nameLabel.innerHTML = 'ชื่อ-นามสกุล <span class="text-danger">*</span>';
+    personInputs.forEach(el => { el.disabled = false; });
+    if (phonePerson) phonePerson.disabled = false;
+    if (emailPerson) emailPerson.disabled = false;
+    companyInputs.forEach(el => { el.disabled = true; });
+  }
+}
+document.addEventListener('DOMContentLoaded', function() {
+  const checked = document.querySelector('input[name="member_type"]:checked');
+  if (checked) toggleMemberType(checked.value);
+});
+</script>
 {% endblock %}

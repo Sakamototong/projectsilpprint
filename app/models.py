@@ -43,6 +43,7 @@ class Store(Base):
     members = relationship("Member", back_populates="store")
     staff = relationship("StaffUser", back_populates="store")
     products = relationship("Product", back_populates="store")
+    companies = relationship("Company", back_populates="store", order_by="Company.company_name")
 
 
 class StaffUser(Base):
@@ -88,6 +89,21 @@ class BillingProfile(Base):
     member = relationship("Member", back_populates="billing_profiles")
 
 
+class Company(Base):
+    """บริษัท / ผู้รับใบกำกับภาษีในร้านค้า (ไม่ผูกกับสมาชิก)"""
+    __tablename__ = "companies"
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
+    company_name = Column(String, nullable=False)
+    tax_id = Column(String, nullable=True)
+    address = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    is_default = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    store = relationship("Store", back_populates="companies")
+
+
 class Member(Base):
     __tablename__ = "members"
     id = Column(Integer, primary_key=True, index=True)
@@ -101,9 +117,12 @@ class Member(Base):
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     # ข้อมูลบริษัท / ยานพาหนะ
+    member_type = Column(String, default="person")   # "person" | "company"
     company_name = Column(String, nullable=True)
+    tax_id = Column(String, nullable=True)
     driver_name = Column(String, nullable=True)
     license_plate = Column(String, nullable=True)
+    address = Column(String, nullable=True)
     store = relationship("Store", back_populates="members")
     transactions = relationship("Transaction", back_populates="member", order_by="Transaction.timestamp.desc()")
     billing_profiles = relationship("BillingProfile", back_populates="member", order_by="BillingProfile.id")
@@ -112,6 +131,7 @@ class Member(Base):
 class Transaction(Base):
     __tablename__ = "transactions"
     id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     terminal_id = Column(String, nullable=True)
     total = Column(Float, nullable=False)

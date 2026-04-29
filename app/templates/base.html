@@ -679,8 +679,11 @@
       <a class="btn btn-primary btn-sm" href="/web/enroll">
         <i class="bi bi-person-plus-fill"></i> สมัครสมาชิก
       </a>
-      <a class="btn btn-warning btn-sm fw-bold" href="/web/quick-bill">
-        <i class="bi bi-receipt-cutoff"></i> ออกบิล
+      <a class="btn btn-success btn-sm fw-bold" href="/web/cash-bill">
+        <i class="bi bi-cash-coin"></i> ออกบิลเงินสด
+      </a>
+      <a class="btn btn-warning btn-sm fw-bold" href="/web/vat-bill">
+        <i class="bi bi-receipt-cutoff"></i> ออกบิล VAT
       </a>
       <a class="btn btn-outline-info btn-sm" href="/web/members">
         <i class="bi bi-people-fill"></i> รายชื่อ
@@ -759,5 +762,6 @@ spUpdateIcon(localStorage.getItem('sp-theme') || 'light');
   });
 })();
 </script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

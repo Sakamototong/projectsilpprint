@@ -12,7 +12,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from .models import SessionLocal, Store, Member, Transaction, Receipt, BillingProfile, Product, StaffUser, StoreSubscription, SubscriptionPlan, SubscriptionInvoice
+from .models import SessionLocal, Store, Member, Transaction, Receipt, BillingProfile, Product, StaffUser, StoreSubscription, SubscriptionPlan, SubscriptionInvoice, Company
 from .core.security import hash_password, verify_password, create_access_token, decode_token, validate_password
 from .services.member_service import MemberService
 
@@ -378,7 +378,15 @@ def members_page(
     if page < 1:
         page = 1
 
+    mtype = request.query_params.get("mtype", "person")  # "person" | "company" | "all"
+
     query = db.query(Member).filter(Member.store_id == store.id)
+    if mtype in ("person", "company"):
+        query = query.filter(
+            (Member.member_type == mtype) | (Member.member_type == None)
+            if mtype == "person"
+            else Member.member_type == mtype
+        )
     if q:
         query = query.filter(
             Member.name.ilike(f"%{q}%")
@@ -405,6 +413,7 @@ def members_page(
             "user_role": role,
             "page": page,
             "total_pages": total_pages,
+            "mtype": mtype,
         },
     )
 
@@ -426,6 +435,7 @@ def enroll_page(request: Request, db: Session = Depends(get_db)):
 @router.post("/enroll")
 def enroll_post(
     request: Request,
+    member_type: str = Form("person"),
     name: str = Form(...),
     phone: str = Form(None),
     email: str = Form(None),
@@ -433,8 +443,8 @@ def enroll_post(
     birthdate: str = Form(None),
     tier: str = Form("general"),
     company_name: str = Form(None),
-    driver_name: str = Form(None),
-    license_plate: str = Form(None),
+    tax_id: str = Form(None),
+    address: str = Form(None),
     db: Session = Depends(get_db),
 ):
     ctx = _get_user_ctx(request, db)
@@ -475,13 +485,13 @@ def enroll_post(
                         "birthdate": birthdate,
                         "tier": tier,
                         "company_name": company_name,
-                        "driver_name": driver_name,
-                        "license_plate": license_plate,
+                        "address": address,
                     },
                 },
             )
 
     member = Member(
+        member_type=member_type if member_type in ("person", "company") else "person",
         name=name,
         phone=phone or None,
         email=email or None,
@@ -489,8 +499,8 @@ def enroll_post(
         tier=tier,
         store_id=store.id,
         company_name=company_name.strip() if company_name and company_name.strip() else None,
-        driver_name=driver_name.strip() if driver_name and driver_name.strip() else None,
-        license_plate=license_plate.strip().upper() if license_plate and license_plate.strip() else None,
+        tax_id=tax_id.strip() if tax_id and tax_id.strip() else None,
+        address=address.strip() if address and address.strip() else None,
     )
     db.add(member)
     db.flush()  # รับ id ก่อน commit
@@ -579,7 +589,10 @@ def new_bill_post(
     new_bp_tax_id: str = Form(""),
     new_bp_address: str = Form(""),
     new_bp_phone: str = Form(""),
+    new_bp_email: str = Form(""),
     new_bp_save: str = Form(""),
+    driver_name: str = Form(""),
+    license_plate: str = Form(""),
     db: Session = Depends(get_db),
 ):
     ctx = _get_user_ctx(request, db)
@@ -657,6 +670,7 @@ def new_bill_post(
             "tax_id": new_bp_tax_id.strip() or None,
             "address": new_bp_address.strip() or None,
             "phone": new_bp_phone.strip() or None,
+            "email": new_bp_email.strip() or None,
             "label": company,
         }
     elif billing_profile_id:
@@ -669,6 +683,7 @@ def new_bill_post(
             pass
 
     tx = Transaction(
+        store_id=store.id,
         total=total,
         payment_method=payment_method,
         member_id=member_id,
@@ -704,6 +719,8 @@ def new_bill_post(
             "note": note,
             "points_earned": points_earned,
             "billing_profile": bp_payload,
+            "driver_name": driver_name.strip() if driver_name and driver_name.strip() else None,
+            "license_plate": license_plate.strip().upper() if license_plate and license_plate.strip() else None,
         },
         created_by_name=ctx["actor_name"],
         created_by_id=ctx["actor_id"],
@@ -740,7 +757,7 @@ def receipt_view(request: Request, receipt_id: int, db: Session = Depends(get_db
     payload = receipt.raw_payload or {}
     points_earned = payload.get("points_earned", 0)
     amount_text = thai_baht_text(payload.get("total", 0))
-    is_cash = bool(payload.get("is_cash")) or (tx and tx.member_id is None)
+    is_cash = bool(payload.get("is_cash")) and payload.get("bill_type") != "vat"
     template_name = "receipt_cash.html" if is_cash else "receipt_view.html"
     return templates.TemplateResponse(
         request,
@@ -777,13 +794,18 @@ def receipt_edit_page(request: Request, receipt_id: int, db: Session = Depends(g
     if receipt.deleted_at:
         return RedirectResponse(f"/web/receipts/{receipt_id}", status_code=302)
     tx = receipt.transaction
+    payload = receipt.raw_payload or {}
+    is_vat_bill = payload.get("bill_type") == "vat"
     member = None
     if tx and tx.member_id:
         member = db.query(Member).filter(Member.id == tx.member_id, Member.store_id == store.id).first()
         if not member:
             return RedirectResponse("/web/members", status_code=302)
-    payload = receipt.raw_payload or {}
-    billing_profiles = db.query(BillingProfile).filter(BillingProfile.member_id == tx.member_id).all() if tx else []
+    elif not is_vat_bill:
+        # Non-VAT, no member — shouldn't normally exist; redirect to safety
+        return RedirectResponse("/web/members", status_code=302)
+    billing_profiles = db.query(BillingProfile).filter(BillingProfile.member_id == tx.member_id).all() if (tx and tx.member_id) else []
+    companies = db.query(Company).filter(Company.store_id == store.id).order_by(Company.company_name).all() if is_vat_bill else []
     bp_raw = payload.get("billing_profile")
     # Detect if the saved billing profile has been deleted (label no longer matches any active profile)
     bp_orphaned = False
@@ -799,6 +821,8 @@ def receipt_edit_page(request: Request, receipt_id: int, db: Session = Depends(g
         "member": member,
         "payload": payload,
         "billing_profiles": billing_profiles,
+        "companies": companies,
+        "is_vat_bill": is_vat_bill,
         "bp_orphaned": bp_orphaned,
         "products": products,
         "user_role": role,
@@ -813,7 +837,16 @@ def receipt_edit_post(
     payment_method: str = Form("cash"),
     note: str = Form(""),
     billing_profile_id: str = Form(""),
+    company_id: str = Form(""),
     vat_type: str = Form("none"),
+    driver_name: str = Form(""),
+    license_plate: str = Form(""),
+    new_company_name: str = Form(""),
+    new_company_tax_id: str = Form(""),
+    new_company_address: str = Form(""),
+    new_company_phone: str = Form(""),
+    new_company_email: str = Form(""),
+    new_company_save: str = Form(""),
     db: Session = Depends(get_db),
 ):
     ctx = _get_user_ctx(request, db)
@@ -826,16 +859,19 @@ def receipt_edit_post(
     if receipt.deleted_at:
         return RedirectResponse(f"/web/receipts/{receipt_id}", status_code=302)
     tx = receipt.transaction
-    member = db.query(Member).filter(Member.id == tx.member_id, Member.store_id == store.id).first() if tx else None
-    if not member:
+    payload_check = receipt.raw_payload or {}
+    is_vat_bill = payload_check.get("bill_type") == "vat"
+    member = db.query(Member).filter(Member.id == tx.member_id, Member.store_id == store.id).first() if (tx and tx.member_id) else None
+    if not member and not is_vat_bill:
         return RedirectResponse("/web/members", status_code=302)
 
     # บันทึก payload เก่าก่อนแก้ไข
     old_payload = dict(receipt.raw_payload or {})
 
-    # Reverse old points
+    # Reverse old points (member bills only)
     old_points = (receipt.raw_payload or {}).get("points_earned", 0)
-    MemberService.add_points(db, member.id, -old_points)
+    if member:
+        MemberService.add_points(db, member.id, -old_points)
 
     items = json.loads(items_json)
     item_total = sum(float(i["qty"]) * float(i["price"]) for i in items)
@@ -854,21 +890,64 @@ def receipt_edit_post(
         vat_rate = 0.0
         total = subtotal
 
-    points_earned = MemberService.points_for_amount(total)
+    points_earned = MemberService.points_for_amount(total) if member else 0
 
     bp = None
     kept_bp_snapshot = None
-    if billing_profile_id == "__keep__":
-        # Re-use the billing profile snapshot already stored in the receipt (profile was deleted)
-        kept_bp_snapshot = (receipt.raw_payload or {}).get("billing_profile")
-    elif billing_profile_id:
-        try:
-            bp = db.query(BillingProfile).filter(
-                BillingProfile.id == int(billing_profile_id),
-                BillingProfile.member_id == member.id,
-            ).first()
-        except (ValueError, Exception):
-            pass
+    if is_vat_bill:
+        # VAT bill — resolve company from companies table
+        if company_id == "__keep__":
+            kept_bp_snapshot = (receipt.raw_payload or {}).get("billing_profile")
+        elif company_id == "__new__" and new_company_name.strip():
+            co_snapshot = {
+                "company_name": new_company_name.strip(),
+                "tax_id": new_company_tax_id.strip() or None,
+                "address": new_company_address.strip() or None,
+                "phone": new_company_phone.strip() or None,
+                "email": new_company_email.strip() or None,
+                "label": new_company_name.strip(),
+            }
+            kept_bp_snapshot = co_snapshot
+            if new_company_save:
+                co = Company(
+                    store_id=store.id,
+                    company_name=new_company_name.strip(),
+                    tax_id=new_company_tax_id.strip() or None,
+                    address=new_company_address.strip() or None,
+                    phone=new_company_phone.strip() or None,
+                    email=new_company_email.strip() or None,
+                )
+                db.add(co)
+                db.flush()
+        elif company_id:
+            try:
+                co = db.query(Company).filter(
+                    Company.id == int(company_id),
+                    Company.store_id == store.id,
+                ).first()
+                if co:
+                    kept_bp_snapshot = {
+                        "company_name": co.company_name,
+                        "tax_id": co.tax_id,
+                        "address": co.address,
+                        "phone": co.phone,
+                        "email": co.email,
+                        "label": co.company_name,
+                    }
+            except (ValueError, Exception):
+                pass
+    else:
+        # Member bill — existing billing_profile logic
+        if billing_profile_id == "__keep__":
+            kept_bp_snapshot = (receipt.raw_payload or {}).get("billing_profile")
+        elif billing_profile_id:
+            try:
+                bp = db.query(BillingProfile).filter(
+                    BillingProfile.id == int(billing_profile_id),
+                    BillingProfile.member_id == member.id,
+                ).first()
+            except (ValueError, Exception):
+                pass
 
     # Update transaction
     tx.total = total
@@ -877,17 +956,24 @@ def receipt_edit_post(
               "vat_rate": vat_rate, "vat_type": vat_type, "total": total,
               "payment_method": payment_method, "note": note}
     # Update receipt
+    new_driver_name = driver_name.strip() if driver_name and driver_name.strip() else None
+    new_license_plate = license_plate.strip().upper() if license_plate and license_plate.strip() else None
     receipt.raw_payload = {
         "items": items, "subtotal": subtotal, "vat_amount": vat_amount,
         "vat_rate": vat_rate, "vat_type": vat_type, "total": total,
         "payment_method": payment_method, "note": note,
         "points_earned": points_earned,
+        "driver_name": new_driver_name,
+        "license_plate": new_license_plate,
+        "bill_type": payload_check.get("bill_type"),
+        "is_cash": payload_check.get("is_cash", False),
         "billing_profile": kept_bp_snapshot if kept_bp_snapshot else (
             {
                 "company_name": bp.company_name if bp else None,
                 "tax_id": bp.tax_id if bp else None,
                 "address": bp.address if bp else None,
                 "phone": bp.phone if bp else None,
+                "email": getattr(bp, "email", None) if bp else None,
                 "label": bp.label if bp else None,
             } if bp else None
         ),
@@ -902,6 +988,10 @@ def receipt_edit_post(
     old_items = old_payload.get("items", [])
     if json.dumps(old_items, sort_keys=True) != json.dumps(items, sort_keys=True):
         edit_changes["items"] = {"old_count": len(old_items), "new_count": len(items)}
+    if old_payload.get("driver_name", "") != (new_driver_name or ""):
+        edit_changes["driver_name"] = {"old": old_payload.get("driver_name", ""), "new": new_driver_name or ""}
+    if old_payload.get("license_plate", "") != (new_license_plate or ""):
+        edit_changes["license_plate"] = {"old": old_payload.get("license_plate", ""), "new": new_license_plate or ""}
     edit_entry = {
         "at": datetime.now(_tz.utc).isoformat(),
         "by_name": ctx["actor_name"],
@@ -916,7 +1006,8 @@ def receipt_edit_post(
     db.add(receipt)
     db.commit()
 
-    MemberService.add_points(db, member.id, points_earned)
+    if member:
+        MemberService.add_points(db, member.id, points_earned)
 
     return RedirectResponse(f"/web/receipts/{receipt_id}", status_code=302)
 
@@ -981,6 +1072,7 @@ def member_edit_page(request: Request, member_id: int, db: Session = Depends(get
 def member_edit_post(
     request: Request,
     member_id: int,
+    member_type: str = Form("person"),
     name: str = Form(...),
     phone: str = Form(None),
     email: str = Form(None),
@@ -988,8 +1080,8 @@ def member_edit_post(
     birthdate: str = Form(None),
     tier: str = Form("general"),
     company_name: str = Form(None),
-    driver_name: str = Form(None),
-    license_plate: str = Form(None),
+    tax_id: str = Form(None),
+    address: str = Form(None),
     db: Session = Depends(get_db),
 ):
     ctx = _get_user_ctx(request, db)
@@ -1014,6 +1106,7 @@ def member_edit_post(
                 "user_role": role,
                 "error": f"เบอร์ {phone} มีอยู่ในระบบแล้ว (สมาชิก {dup.name})",
             })
+    member.member_type = member_type if member_type in ("person", "company") else "person"
     member.name = name
     member.phone = phone or None
     member.email = email or None
@@ -1021,8 +1114,8 @@ def member_edit_post(
     member.birthdate = birthdate or None
     member.tier = tier
     member.company_name = company_name.strip() if company_name and company_name.strip() else None
-    member.driver_name = driver_name.strip() if driver_name and driver_name.strip() else None
-    member.license_plate = license_plate.strip().upper() if license_plate and license_plate.strip() else None
+    member.tax_id = tax_id.strip() if tax_id and tax_id.strip() else None
+    member.address = address.strip() if address and address.strip() else None
     db.commit()
     return RedirectResponse(f"/web/members/{member_id}?updated=1", status_code=302)
 
@@ -1633,13 +1726,11 @@ def staff_delete(request: Request, staff_id: int, db: Session = Depends(get_db))
 
 def _summary_query(db: Session, store_id: int, start: datetime, end: datetime):
     """คืนค่า list ของ (timestamp, total, payment_method) สำหรับใบเสร็จที่ไม่ถูกลบ"""
-    from .models import Member as _Member
     return (
         db.query(Transaction.timestamp, Transaction.total, Transaction.payment_method)
         .join(Receipt, Receipt.transaction_id == Transaction.id)
-        .join(_Member, _Member.id == Transaction.member_id)
         .filter(
-            _Member.store_id == store_id,
+            Transaction.store_id == store_id,
             Receipt.deleted_at == None,
             Transaction.timestamp >= start,
             Transaction.timestamp < end,
@@ -1832,11 +1923,10 @@ def summary_detail_page(
         return RedirectResponse("/web/summary", status_code=302)
 
     rows = (
-        db.query(Receipt, Transaction, Member)
+        db.query(Receipt, Transaction)
         .join(Transaction, Transaction.id == Receipt.transaction_id)
-        .join(Member, Member.id == Transaction.member_id)
         .filter(
-            Member.store_id == store.id,
+            Transaction.store_id == store.id,
             Receipt.deleted_at == None,
             Transaction.timestamp >= start,
             Transaction.timestamp < end,
@@ -1846,12 +1936,22 @@ def summary_detail_page(
     )
 
     receipts_detail = []
-    for receipt, tx, member in rows:
+    for receipt, tx in rows:
         payload = receipt.raw_payload or {}
+        # หาสมาชิก (ถ้ามี)
+        member = db.query(Member).filter(Member.id == tx.member_id).first() if tx.member_id else None
+        bp = payload.get("billing_profile") or {}
+        display_name = (
+            bp.get("company_name")
+            or (member.name if member else None)
+            or payload.get("customer_name")
+            or "–"
+        )
         receipts_detail.append({
             "receipt": receipt,
             "transaction": tx,
             "member": member,
+            "display_name": display_name,
             "total": tx.total,
             "payment_method": tx.payment_method or "–",
             "items_count": len(payload.get("items", [])),
@@ -2073,6 +2173,7 @@ def cash_bill_post(
         total = subtotal
 
     tx = Transaction(
+        store_id=store.id,
         total=total,
         payment_method=payment_method,
         member_id=None,
@@ -2113,6 +2214,235 @@ def cash_bill_post(
 
 
 
+@router.get("/vat-bill", response_class=HTMLResponse)
+def vat_bill_page(request: Request, db: Session = Depends(get_db)):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+    products = _get_products(db, store.id)
+
+    # ใช้สมาชิกประเภท company เป็น dropdown หลัก
+    company_members = (
+        db.query(Member)
+        .filter(Member.store_id == store.id, Member.member_type == "company")
+        .order_by(Member.company_name, Member.name)
+        .all()
+    )
+    # รวม billing_profiles จากสมาชิกทั่วไปด้วย (backward compat)
+    seen_names = set()
+    company_choices = []
+    for m in company_members:
+        display = m.company_name or m.name
+        key = display.strip().lower()
+        seen_names.add(key)
+        company_choices.append({
+            "value": f"mem_{m.id}",
+            "company_name": display,
+            "tax_id": m.tax_id,
+        })
+    # billing_profiles ที่มีอยู่เดิม (ไม่ซ้ำชื่อ)
+    member_ids = db.query(Member.id).filter(Member.store_id == store.id).scalar_subquery()
+    bps = (
+        db.query(BillingProfile)
+        .filter(BillingProfile.member_id.in_(member_ids))
+        .order_by(BillingProfile.company_name)
+        .all()
+    )
+    for bp in bps:
+        if not bp.company_name:
+            continue
+        key = bp.company_name.strip().lower()
+        if key in seen_names:
+            continue
+        seen_names.add(key)
+        company_choices.append({
+            "value": f"bp_{bp.id}",
+            "company_name": bp.company_name,
+            "tax_id": bp.tax_id,
+        })
+    company_choices.sort(key=lambda x: (x["company_name"] or "").lower())
+
+    return templates.TemplateResponse(request, "vat_bill.html", {
+        "store_name": store.name,
+        "store": store,
+        "user_role": ctx["role"],
+        "products": products,
+        "company_choices": company_choices,
+    })
+
+
+@router.post("/vat-bill", response_class=HTMLResponse)
+def vat_bill_post(
+    request: Request,
+    items_json: str = Form(...),
+    payment_method: str = Form("cash"),
+    note: str = Form(""),
+    vat_type: str = Form("exclusive"),
+    company_id: str = Form(""),
+    driver_name: str = Form(""),
+    license_plate: str = Form(""),
+    new_company_name: str = Form(""),
+    new_company_tax_id: str = Form(""),
+    new_company_address: str = Form(""),
+    new_company_phone: str = Form(""),
+    new_company_email: str = Form(""),
+    new_company_save: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    ctx = _get_user_ctx(request, db)
+    if not ctx:
+        return RedirectResponse("/web/login", status_code=302)
+    store = ctx["store"]
+
+    items = json.loads(items_json)
+    item_total = sum(float(i["qty"]) * float(i["price"]) for i in items)
+    vat_rate = store.vat_rate or 7.0
+
+    if vat_type == "exclusive":
+        subtotal = round(item_total, 2)
+        vat_amount = round(subtotal * vat_rate / 100, 2)
+        total = round(subtotal + vat_amount, 2)
+    elif vat_type == "inclusive":
+        total = round(item_total, 2)
+        subtotal = round(total / (1 + vat_rate / 100), 2)
+        vat_amount = round(total - subtotal, 2)
+    else:
+        subtotal = round(item_total, 2)
+        vat_amount = 0.0
+        vat_rate = 0.0
+        total = subtotal
+
+    # Resolve billing profile snapshot from selected / new company
+    bp_snapshot = None
+    vat_member_id = None  # เชื่อม transaction กับสมาชิกประเภทบริษัท
+    if company_id == "__new__" and new_company_name.strip():
+        bp_snapshot = {
+            "company_name": new_company_name.strip(),
+            "tax_id": new_company_tax_id.strip() or None,
+            "address": new_company_address.strip() or None,
+            "phone": new_company_phone.strip() or None,
+            "email": new_company_email.strip() or None,
+            "label": new_company_name.strip(),
+        }
+        if new_company_save:
+            # บันทึกเป็น Member type=company
+            new_m = Member(
+                member_type="company",
+                name=new_company_name.strip(),
+                company_name=new_company_name.strip(),
+                tax_id=new_company_tax_id.strip() or None,
+                address=new_company_address.strip() or None,
+                phone=new_company_phone.strip() or None,
+                email=new_company_email.strip() or None,
+                store_id=store.id,
+                tier="general",
+                points=0,
+            )
+            db.add(new_m)
+            db.flush()
+            new_m.member_code = f"C{store.id:04d}{new_m.id:07d}"
+            vat_member_id = new_m.id
+    elif company_id.startswith("mem_"):
+        try:
+            m = db.query(Member).filter(
+                Member.id == int(company_id[4:]),
+                Member.store_id == store.id,
+            ).first()
+            if m:
+                vat_member_id = m.id
+                bp_snapshot = {
+                    "company_name": m.company_name or m.name,
+                    "tax_id": m.tax_id,
+                    "address": m.address,
+                    "phone": m.phone,
+                    "email": m.email,
+                    "label": m.company_name or m.name,
+                }
+        except (ValueError, Exception):
+            pass
+    elif company_id.startswith("co_"):
+        try:
+            co = db.query(Company).filter(
+                Company.id == int(company_id[3:]),
+                Company.store_id == store.id,
+            ).first()
+            if co:
+                bp_snapshot = {
+                    "company_name": co.company_name,
+                    "tax_id": co.tax_id,
+                    "address": co.address,
+                    "phone": co.phone,
+                    "email": co.email,
+                    "label": co.company_name,
+                }
+        except (ValueError, Exception):
+            pass
+    elif company_id.startswith("bp_"):
+        try:
+            member_ids = db.query(Member.id).filter(Member.store_id == store.id).scalar_subquery()
+            bp = db.query(BillingProfile).filter(
+                BillingProfile.id == int(company_id[3:]),
+                BillingProfile.member_id.in_(member_ids),
+            ).first()
+            if bp:
+                bp_snapshot = {
+                    "company_name": bp.company_name,
+                    "tax_id": bp.tax_id,
+                    "address": bp.address,
+                    "phone": bp.phone,
+                    "email": getattr(bp, "email", None),
+                    "label": bp.company_name or bp.label,
+                }
+        except (ValueError, Exception):
+            pass
+
+    clean_plate = license_plate.strip().upper() if license_plate and license_plate.strip() else None
+    clean_driver = driver_name.strip() if driver_name and driver_name.strip() else None
+
+    tx = Transaction(
+        store_id=store.id,
+        total=total,
+        payment_method=payment_method,
+        member_id=vat_member_id,
+        terminal_id="web-vat",
+        raw={"items": items, "subtotal": subtotal, "vat_amount": vat_amount,
+             "vat_rate": vat_rate, "vat_type": vat_type, "total": total,
+             "payment_method": payment_method, "note": note},
+    )
+    db.add(tx)
+    db.commit()
+    db.refresh(tx)
+
+    receipt = Receipt(
+        transaction_id=tx.id,
+        raw_payload={
+            "bill_type": "vat",
+            "items": items,
+            "subtotal": subtotal,
+            "vat_amount": vat_amount,
+            "vat_rate": vat_rate,
+            "vat_type": vat_type,
+            "total": total,
+            "payment_method": payment_method,
+            "note": note,
+            "points_earned": 0,
+            "driver_name": clean_driver,
+            "license_plate": clean_plate,
+            "billing_profile": bp_snapshot,
+            "is_cash": False,
+        },
+        created_by_name=ctx["actor_name"],
+        created_by_id=ctx["actor_id"],
+    )
+    db.add(receipt)
+    db.commit()
+    db.refresh(receipt)
+
+    return RedirectResponse(f"/web/receipts/{receipt.id}", status_code=302)
+
+
+
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard_page(request: Request, db: Session = Depends(get_db)):
     ctx = _get_user_ctx(request, db)
@@ -2129,22 +2459,16 @@ def dashboard_page(request: Request, db: Session = Depends(get_db)):
         Member.created_at >= month_start,
     ).count()
 
-    total_receipts = db.query(Receipt).join(Transaction).filter(
-        Transaction.member_id == Member.id,
-        Member.store_id == store.id,
-        Receipt.deleted_at.is_(None),
+    total_tx = db.query(Transaction).filter(
+        Transaction.store_id == store.id
     ).count()
-    # simpler: count transactions directly
-    total_tx = db.query(Transaction).join(Member).filter(
-        Member.store_id == store.id
-    ).count()
-    tx_month = db.query(Transaction).join(Member).filter(
-        Member.store_id == store.id,
+    tx_month = db.query(Transaction).filter(
+        Transaction.store_id == store.id,
         Transaction.timestamp >= month_start,
     ).count()
 
-    revenue_month = db.query(func.coalesce(func.sum(Transaction.total), 0)).join(Member).filter(
-        Member.store_id == store.id,
+    revenue_month = db.query(func.coalesce(func.sum(Transaction.total), 0)).filter(
+        Transaction.store_id == store.id,
         Transaction.timestamp >= month_start,
     ).scalar()
 
@@ -2156,8 +2480,7 @@ def dashboard_page(request: Request, db: Session = Depends(get_db)):
     # Recent transactions
     recent_tx = (
         db.query(Transaction)
-        .join(Member)
-        .filter(Member.store_id == store.id)
+        .filter(Transaction.store_id == store.id)
         .order_by(Transaction.timestamp.desc())
         .limit(10)
         .all()

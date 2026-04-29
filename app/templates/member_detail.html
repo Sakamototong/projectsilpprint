@@ -48,9 +48,6 @@
       {% if member.company_name %}
       <div class="text-muted mb-1 small"><i class="bi bi-person me-1"></i>{{ member.name }}</div>
       {% endif %}
-      {% if member.license_plate %}
-      <div class="mb-1"><span class="badge bg-secondary font-monospace">{{ member.license_plate }}</span>{% if member.driver_name %} <span class="small text-muted">{{ member.driver_name }}</span>{% endif %}</div>
-      {% endif %}
       {% set tc = {'general':'secondary','silver':'light','gold':'warning','platinum':'info'} %}
       <span class="badge tier-{{ member.tier or 'general' }} mb-3 fs-6">
         {{ {'general':'ทั่วไป','silver':'Silver','gold':'Gold','platinum':'Platinum'}.get(member.tier, member.tier) }}
@@ -127,16 +124,10 @@
             <td class="fw-bold">{{ member.company_name }}</td>
           </tr>
           {% endif %}
-          {% if member.driver_name %}
+          {% if member.address %}
           <tr>
-            <td class="text-muted">ผู้ขับ / ผู้ติดต่อ</td>
-            <td>{{ member.driver_name }}</td>
-          </tr>
-          {% endif %}
-          {% if member.license_plate %}
-          <tr>
-            <td class="text-muted">ทะเบียนรถ</td>
-            <td><span class="badge bg-secondary font-monospace">{{ member.license_plate }}</span></td>
+            <td class="text-muted">ที่อยู่</td>
+            <td>{{ member.address }}</td>
           </tr>
           {% endif %}
           <tr>

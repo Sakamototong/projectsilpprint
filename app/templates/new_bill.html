@@ -62,6 +62,10 @@
         <input type="hidden" name="items_json" id="items_json">
 
         <h6 class="fw-bold mb-2 text-muted text-uppercase small"><i class="bi bi-building me-1"></i>ออกในนาม / ที่อยู่ใบเสร็จ</h6>
+        <div class="mb-1">
+          <input type="text" id="bpSearchInput" class="form-control form-control-sm mb-1"
+                 placeholder="🔍 ค้นหาบริษัท / ที่อยู่..." autocomplete="off">
+        </div>
         <div class="mb-2">
           <select name="billing_profile_id" id="bpSelect" class="form-select form-select-sm">
             <option value=""> ออกในนามส่วนตัว (ใช้ชื่อสมาชิก) </option>
@@ -75,7 +79,7 @@
         </div>
 
         {# ── Inline new billing profile ── #}
-        <div id="newBpPanel" class="card border-primary border-opacity-50 p-3 mb-4" style="display:none;">
+        <div id="newBpPanel" class="card border-primary border-opacity-50 p-3 mb-3" style="display:none;">
           <p class="small fw-bold text-primary mb-2"><i class="bi bi-building-add me-1"></i>กรอกที่อยู่ใหม่</p>
           <div class="mb-2">
             <label class="form-label small fw-bold mb-1">ชื่อบริษัท / ผู้รับใบกำกับ <span class="text-danger">*</span></label>
@@ -95,6 +99,11 @@
             </div>
           </div>
           <div class="mb-2">
+            <label class="form-label small fw-bold mb-1">อีเมล</label>
+            <input type="text" name="new_bp_email" id="new_bp_email" class="form-control form-control-sm"
+                   placeholder="email@example.com">
+          </div>
+          <div class="mb-2">
             <label class="form-label small fw-bold mb-1">ที่อยู่</label>
             <textarea name="new_bp_address" class="form-control form-control-sm" rows="2"
                       placeholder="บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์"></textarea>
@@ -102,6 +111,20 @@
           <div class="form-check">
             <input type="checkbox" class="form-check-input" name="new_bp_save" value="1" id="new_bp_save" checked>
             <label class="form-check-label small" for="new_bp_save">บันทึกที่อยู่นี้ไว้ใช้ครั้งหน้า</label>
+          </div>
+        </div>
+
+        {# ── ชื่อคนขับ / เลขทะเบียน ── #}
+        <div class="row g-2 mb-4">
+          <div class="col-sm-6">
+            <label class="form-label small fw-bold mb-1"><i class="bi bi-person me-1"></i>ชื่อคนขับ <span class="text-muted fw-normal">(ถ้ามี)</span></label>
+            <input type="text" name="driver_name" class="form-control form-control-sm"
+                   placeholder="ชื่อคนขับรถ">
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label small fw-bold mb-1"><i class="bi bi-card-text me-1"></i>เลขทะเบียนรถ <span class="text-muted fw-normal">(ถ้ามี)</span></label>
+            <input type="text" name="license_plate" id="licensePlateInput" class="form-control form-control-sm"
+                   placeholder="เช่น กข-1234">
           </div>
         </div>
 
@@ -288,6 +311,20 @@ document.getElementById('bpSelect').addEventListener('change', function () {
     panel.style.display = 'none';
   }
 });
+// billing profile search filter
+(function () {
+  const searchInput = document.getElementById('bpSearchInput');
+  const sel = document.getElementById('bpSelect');
+  const allOptions = Array.from(sel.options).map(o => ({ el: o, text: o.textContent.toLowerCase() }));
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      const q = this.value.toLowerCase().trim();
+      allOptions.forEach(item => {
+        item.el.hidden = q !== '' && !item.el.value.startsWith('__') && !item.text.includes(q);
+      });
+    });
+  }
+})();
 // tax / phone formatting in new bp panel
 (function () {
   function fmtTax(v) {
@@ -308,6 +345,8 @@ document.getElementById('bpSelect').addEventListener('change', function () {
   }
   document.getElementById('new_bp_tax_id').addEventListener('input', function(){ this.value=fmtTax(this.value); });
   document.getElementById('new_bp_phone').addEventListener('input', function(){ this.value=fmtPhone(this.value); });
+  const lpInput = document.getElementById('licensePlateInput');
+  if (lpInput) lpInput.addEventListener('blur', function(){ this.value = this.value.toUpperCase(); });
 })();
 document.getElementById('billForm').addEventListener('submit', function (e) {
   // validate new billing profile if selected

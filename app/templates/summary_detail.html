@@ -75,11 +75,20 @@
         <tr>
           <td class="ps-3 font-monospace text-muted small">#{{ '%09d'|format(receipt.id) }}</td>
           <td>
+            {% if member %}
             <a href="/web/members/{{ member.id }}" class="text-decoration-none fw-semibold">
-              {{ member.name }}
+              {{ r.display_name }}
             </a>
             {% if member.member_code %}
             <div class="text-muted small">{{ member.member_code }}</div>
+            {% endif %}
+            {% else %}
+            <span class="fw-semibold">{{ r.display_name }}</span>
+            {% if r.receipt.raw_payload and r.receipt.raw_payload.get('bill_type') == 'vat' %}
+            <div class="text-muted small"><i class="bi bi-file-earmark-text me-1"></i>VAT</div>
+            {% elif r.receipt.raw_payload and r.receipt.raw_payload.get('is_cash') %}
+            <div class="text-muted small"><i class="bi bi-cash me-1"></i>เงินสด</div>
+            {% endif %}
             {% endif %}
           </td>
           <td class="small text-muted">
