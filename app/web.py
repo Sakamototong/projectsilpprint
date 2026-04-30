@@ -2369,7 +2369,7 @@ def vat_bill_page(request: Request, db: Session = Depends(get_db)):
         "user_role": ctx["role"],
         "products": products,
         "company_choices": company_choices,
-        "company_bps_json": json.dumps(company_bps, ensure_ascii=False),
+        "company_bps": company_bps,
     })
 
 

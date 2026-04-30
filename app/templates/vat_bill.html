@@ -110,34 +110,43 @@
 
         {# ── เลือก / กรอกที่อยู่สำหรับบริษัทที่มีอยู่แล้ว ── #}
         <div id="existingCoPanel" class="card border-info border-opacity-50 p-3 mb-3" style="display:none;">
-          <p class="small fw-bold text-info mb-2">
-            <i class="bi bi-geo-alt-fill me-1"></i>เลือกที่อยู่สำหรับบิลนี้
-          </p>
-          {# Hidden field: ID ของ BillingProfile ที่เลือก (ว่าง = ใช้ที่อยู่หลักของบริษัท หรือกรอกใหม่) #}
           <input type="hidden" name="selected_bp_id" id="selectedBpId" value="">
-          {# JS จะ render radio cards ที่นี่ #}
-          <div id="addrPickerList" class="mb-2"></div>
-          {# Panel กรอกที่อยู่ใหม่ #}
-          <div id="newAddrPanel" style="display:none;" class="mt-2 border-top pt-2">
-            <div class="mb-2">
-              <label class="form-label small fw-bold mb-1">ที่อยู่ใหม่ <span class="text-danger">*</span></label>
-              <textarea name="new_addr_text" id="newAddrText" class="form-control form-control-sm" rows="2"
-                        placeholder="บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์"></textarea>
+          {# Preview row — แสดงที่อยู่ที่จะใช้ ซ่อน picker ไว้ก่อน #}
+          <div class="d-flex align-items-start gap-2">
+            <i class="bi bi-geo-alt-fill text-info mt-1 flex-shrink-0"></i>
+            <div class="flex-grow-1">
+              <div class="small text-muted mb-1">ที่อยู่ที่จะใช้ในบิลนี้</div>
+              <div id="addrPreviewText" class="small fw-semibold" style="white-space:pre-wrap;"></div>
             </div>
-            <div class="mb-2">
-              <label class="form-label small fw-bold mb-1">เบอร์โทร</label>
-              <input type="text" name="new_addr_phone" id="newAddrPhone" class="form-control form-control-sm"
-                     placeholder="XXX-XXX-XXXX" maxlength="12" inputmode="numeric">
-            </div>
-            <div class="form-check mb-1">
-              <input type="checkbox" class="form-check-input" name="new_addr_save" value="1"
-                     id="newAddrSave" onchange="document.getElementById('newAddrLabelRow').style.display=this.checked?'':'none'">
-              <label class="form-check-label small" for="newAddrSave">บันทึกที่อยู่นี้ไว้ถาวร</label>
-            </div>
-            <div id="newAddrLabelRow" style="display:none;" class="mb-1">
-              <label class="form-label small fw-bold mb-1">ชื่อ / ป้ายกำกับที่อยู่นี้</label>
-              <input type="text" name="new_addr_label" id="newAddrLabel" class="form-control form-control-sm"
-                     placeholder="เช่น สำนักงานใหญ่, สาขา 2">
+            <button type="button" class="btn btn-outline-info btn-sm flex-shrink-0" onclick="toggleAddrPicker()">
+              <i class="bi bi-pencil-square me-1"></i>เปลี่ยน / เพิ่ม
+            </button>
+          </div>
+          {# Collapsible picker — ซ่อนอยู่จนกว่าผู้ใช้จะกดปุ่ม #}
+          <div id="addrPickerCollapse" style="display:none;" class="mt-3 border-top pt-3">
+            <p class="small fw-bold text-info mb-2"><i class="bi bi-list-ul me-1"></i>เลือกที่อยู่สำหรับบิลนี้</p>
+            <div id="addrPickerList" class="mb-2"></div>
+            <div id="newAddrPanel" style="display:none;" class="mt-2 border-top pt-2">
+              <div class="mb-2">
+                <label class="form-label small fw-bold mb-1">ที่อยู่ใหม่ <span class="text-danger">*</span></label>
+                <textarea name="new_addr_text" id="newAddrText" class="form-control form-control-sm" rows="2"
+                          placeholder="บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์"></textarea>
+              </div>
+              <div class="mb-2">
+                <label class="form-label small fw-bold mb-1">เบอร์โทร</label>
+                <input type="text" name="new_addr_phone" id="newAddrPhone" class="form-control form-control-sm"
+                       placeholder="XXX-XXX-XXXX" maxlength="12" inputmode="numeric">
+              </div>
+              <div class="form-check mb-1">
+                <input type="checkbox" class="form-check-input" name="new_addr_save" value="1"
+                       id="newAddrSave" onchange="document.getElementById('newAddrLabelRow').style.display=this.checked?'':'none'">
+                <label class="form-check-label small" for="newAddrSave">บันทึกที่อยู่นี้ไว้ถาวร</label>
+              </div>
+              <div id="newAddrLabelRow" style="display:none;" class="mb-1">
+                <label class="form-label small fw-bold mb-1">ชื่อ / ป้ายกำกับที่อยู่นี้</label>
+                <input type="text" name="new_addr_label" id="newAddrLabel" class="form-control form-control-sm"
+                       placeholder="เช่น สำนักงานใหญ่, สาขา 2">
+              </div>
             </div>
           </div>
         </div>
@@ -320,7 +329,7 @@ document.querySelectorAll('.quick-add').forEach(btn => {
 });
 
 // Per-company BillingProfile data (injected from backend)
-const CO_ADDRESSES = {{ company_bps_json }};
+const CO_ADDRESSES = {{ company_bps | tojson }};
 
 // Custom searchable company dropdown
 (function () {
@@ -341,14 +350,17 @@ const CO_ADDRESSES = {{ company_bps_json }};
     });
   }
 
-  // Render address picker radio cards inside #addrPickerList
-  function renderAddressPicker(coValue) {
-    var bps   = CO_ADDRESSES[coValue] || [];
+  // Address picker — rendered lazily when user opens it
+  var _currentCoValue = '';
+  var _fallbackAddr   = '';
+  var _fallbackPhone  = '';
+
+  function renderAddressPicker() {
+    var bps   = CO_ADDRESSES[_currentCoValue] || [];
     var list  = document.getElementById('addrPickerList');
     var nPanel= document.getElementById('newAddrPanel');
     var selBp = document.getElementById('selectedBpId');
     list.innerHTML = '';
-    selBp.value = '';
     document.getElementById('newAddrText').value  = '';
     document.getElementById('newAddrPhone').value = '';
     document.getElementById('newAddrSave').checked = false;
@@ -356,19 +368,22 @@ const CO_ADDRESSES = {{ company_bps_json }};
     nPanel.style.display = 'none';
 
     if (bps.length === 0) {
-      // No saved addresses → open new address panel straight away
+      // No saved addresses → open new address input pre-filled with member.address
+      if (_fallbackAddr)  document.getElementById('newAddrText').value  = _fallbackAddr;
+      if (_fallbackPhone) document.getElementById('newAddrPhone').value = _fallbackPhone;
       nPanel.style.display = '';
       return;
     }
 
-    // Render radio cards for each BillingProfile
     bps.forEach(function(bp, idx) {
       var rid  = 'addrRadio_' + idx;
       var card = document.createElement('div');
       card.className = 'form-check mb-2 border rounded p-2';
+      var curSel = selBp.value;
+      var checked = curSel ? String(bp.id) === String(curSel) : (bp.is_default || idx === 0);
       var preview = bp.address ? bp.address.substring(0, 60) + (bp.address.length > 60 ? '…' : '') : '(ไม่มีที่อยู่)';
       card.innerHTML =
-        '<input class="form-check-input me-2" type="radio" name="_addrPick" id="' + rid + '" value="' + bp.id + '"' + (bp.is_default || idx === 0 ? ' checked' : '') + '>' +
+        '<input class="form-check-input me-2" type="radio" name="_addrPick" id="' + rid + '" value="' + bp.id + '"' + (checked ? ' checked' : '') + '>' +
         '<label class="form-check-label w-100" for="' + rid + '" style="cursor:pointer;">' +
           '<span class="fw-bold small">' + (bp.label || bp.company_name || 'ที่อยู่ ' + (idx+1)) + '</span>' +
           (bp.is_default ? '<span class="badge bg-primary ms-1" style="font-size:.6rem;">หลัก</span>' : '') +
@@ -378,9 +393,8 @@ const CO_ADDRESSES = {{ company_bps_json }};
       card.querySelector('input[type=radio]').addEventListener('change', function() {
         selBp.value = bp.id;
         nPanel.style.display = 'none';
+        document.getElementById('addrPreviewText').textContent = bp.address || '(ไม่มีที่อยู่)';
       });
-      // Pre-select default/first
-      if (bp.is_default || idx === 0) { selBp.value = bp.id; }
     });
 
     // "New / one-time address" option
@@ -396,14 +410,47 @@ const CO_ADDRESSES = {{ company_bps_json }};
     newCard.querySelector('input[type=radio]').addEventListener('change', function() {
       selBp.value = '';
       nPanel.style.display = '';
+      document.getElementById('addrPreviewText').textContent = '(กรอกที่อยู่ใหม่)';
       document.getElementById('newAddrText').focus();
     });
   }
 
-  function showExistingPanel(coValue) {
+  window.toggleAddrPicker = function() {
+    var col = document.getElementById('addrPickerCollapse');
+    if (col.style.display !== 'none') {
+      col.style.display = 'none';
+    } else {
+      col.style.display = '';
+      renderAddressPicker();
+    }
+  };
+
+  // Show panel with preview only; picker stays hidden until user clicks button
+  function showExistingPanel(coValue, fallbackAddr, fallbackPhone) {
+    _currentCoValue = coValue;
+    _fallbackAddr   = fallbackAddr  || '';
+    _fallbackPhone  = fallbackPhone || '';
+    var bps = CO_ADDRESSES[coValue] || [];
+    var selBp = document.getElementById('selectedBpId');
+    var preview = document.getElementById('addrPreviewText');
+
+    var defaultBp = bps.find(function(b) { return b.is_default; }) || bps[0];
+    if (defaultBp) {
+      selBp.value = defaultBp.id;
+      preview.textContent = defaultBp.address || '(ไม่มีที่อยู่)';
+    } else if (fallbackAddr) {
+      // ใช้ member.address เป็น fallback — backend จะใช้ค่านี้โดยอัตโนมัติ
+      selBp.value = '';
+      preview.textContent = fallbackAddr;
+    } else {
+      selBp.value = '';
+      preview.textContent = '(ยังไม่มีที่อยู่บันทึกไว้ — กด "เปลี่ยน / เพิ่ม" เพื่อเพิ่มที่อยู่)';
+    }
+    document.getElementById('addrPickerCollapse').style.display = 'none';
+    document.getElementById('addrPickerList').innerHTML = '';
+    document.getElementById('newAddrPanel').style.display = 'none';
     document.getElementById('existingCoPanel').style.display = 'block';
     document.getElementById('newCoPanel').style.display = 'none';
-    renderAddressPicker(coValue);
   }
 
   searchInput.addEventListener('focus', openDrop);
@@ -437,7 +484,7 @@ const CO_ADDRESSES = {{ company_bps_json }};
         closeDrop();
       } else {
         searchInput.value = this.dataset.label;
-        showExistingPanel(v);
+        showExistingPanel(v, this.dataset.address || '', this.dataset.phone || '');
         closeDrop();
       }
     });
