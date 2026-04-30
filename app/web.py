@@ -2339,12 +2339,37 @@ def vat_bill_page(request: Request, db: Session = Depends(get_db)):
         })
     company_choices.sort(key=lambda x: (x["company_name"] or "").lower())
 
+    # Build per-member BillingProfile list for address picker (mem_ entries only)
+    company_bps: dict = {}
+    if company_members:
+        mem_id_list = [m.id for m in company_members]
+        all_member_bps = (
+            db.query(BillingProfile)
+            .filter(BillingProfile.member_id.in_(mem_id_list))
+            .order_by(BillingProfile.is_default.desc(), BillingProfile.id)
+            .all()
+        )
+        for bp in all_member_bps:
+            key = f"mem_{bp.member_id}"
+            if key not in company_bps:
+                company_bps[key] = []
+            company_bps[key].append({
+                "id": bp.id,
+                "label": bp.label or bp.company_name or "",
+                "company_name": bp.company_name or "",
+                "tax_id": bp.tax_id or "",
+                "address": bp.address or "",
+                "phone": bp.phone or "",
+                "is_default": bool(bp.is_default),
+            })
+
     return templates.TemplateResponse(request, "vat_bill.html", {
         "store_name": store.name,
         "store": store,
         "user_role": ctx["role"],
         "products": products,
         "company_choices": company_choices,
+        "company_bps_json": json.dumps(company_bps, ensure_ascii=False),
     })
 
 
@@ -2364,9 +2389,11 @@ def vat_bill_post(
     new_company_phone: str = Form(""),
     new_company_email: str = Form(""),
     new_company_save: str = Form(""),
-    override_address: str = Form(""),
-    override_phone: str = Form(""),
-    override_save: str = Form(""),
+    selected_bp_id: str = Form(""),
+    new_addr_text: str = Form(""),
+    new_addr_phone: str = Form(""),
+    new_addr_label: str = Form(""),
+    new_addr_save: str = Form(""),
     db: Session = Depends(get_db),
 ):
     ctx = _get_user_ctx(request, db)
@@ -2476,27 +2503,46 @@ def vat_bill_post(
         except (ValueError, Exception):
             pass
 
-    # Apply override address/phone for existing companies
+    # Apply address selection from BillingProfile picker or newly typed address
     if bp_snapshot is not None and company_id != "__new__":
-        if override_address.strip():
-            bp_snapshot["address"] = override_address.strip()
-        if override_phone.strip():
-            bp_snapshot["phone"] = override_phone.strip()
-        # Save overridden address back to Member record if requested
-        if override_save and company_id.startswith("mem_"):
+        if selected_bp_id.strip():
+            # Use a saved BillingProfile address
             try:
-                m_upd = db.query(Member).filter(
-                    Member.id == int(company_id[4:]),
-                    Member.store_id == store.id,
+                bp_sel = db.query(BillingProfile).filter(
+                    BillingProfile.id == int(selected_bp_id),
+                    BillingProfile.member_id == vat_member_id,
                 ).first()
-                if m_upd:
-                    if override_address.strip():
-                        m_upd.address = override_address.strip()
-                    if override_phone.strip():
-                        m_upd.phone = override_phone.strip()
-                    db.flush()
+                if bp_sel:
+                    bp_snapshot["address"] = bp_sel.address
+                    if bp_sel.phone:
+                        bp_snapshot["phone"] = bp_sel.phone
+                    if bp_sel.company_name:
+                        bp_snapshot["company_name"] = bp_sel.company_name
+                    if bp_sel.tax_id:
+                        bp_snapshot["tax_id"] = bp_sel.tax_id
             except (ValueError, Exception):
                 pass
+        elif new_addr_text.strip():
+            # Use a newly typed address
+            bp_snapshot["address"] = new_addr_text.strip()
+            if new_addr_phone.strip():
+                bp_snapshot["phone"] = new_addr_phone.strip()
+            # Save as a new BillingProfile if requested
+            if new_addr_save and vat_member_id:
+                try:
+                    new_bp = BillingProfile(
+                        member_id=vat_member_id,
+                        label=new_addr_label.strip() or bp_snapshot.get("company_name", ""),
+                        company_name=bp_snapshot.get("company_name"),
+                        tax_id=bp_snapshot.get("tax_id"),
+                        address=new_addr_text.strip(),
+                        phone=new_addr_phone.strip() or None,
+                        is_default=False,
+                    )
+                    db.add(new_bp)
+                    db.flush()
+                except Exception:
+                    pass
 
     clean_plate = license_plate.strip().upper() if license_plate and license_plate.strip() else None
     clean_driver = driver_name.strip() if driver_name and driver_name.strip() else None

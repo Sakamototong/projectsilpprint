@@ -71,6 +71,9 @@
               <label class="form-label form-label-sm">ที่อยู่</label>
               <textarea name="address" id="addressCompany" class="form-control form-control-sm" rows="2"
                         placeholder="บ้านเลขที่ ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด รหัสไปรษณีย์">{{ member.address or '' }}</textarea>
+              <div class="form-text">นี่คือที่อยู่หลักของบริษัท — สำหรับหลายที่อยู่สำหรับออกบิล
+                <a href="/web/members/{{ member.id }}#billing">จัดการที่อยู่บิล →</a>
+              </div>
             </div>
             <div class="col-md-6">
               <label class="form-label form-label-sm">อีเมล</label>
@@ -92,6 +95,9 @@
             <label class="form-label fw-bold"><i class="bi bi-geo-alt me-1"></i>ที่อยู่</label>
             <textarea name="address" id="addressPerson" class="form-control" rows="2"
                       placeholder="บ้านเลขที่ ถนน ตำบล อำเภอ จังหวัด รหัสไปรษณีย์">{{ member.address or '' }}</textarea>
+            <div class="form-text">นี่คือที่อยู่หลัก — สำหรับหลายที่อยู่สำหรับออกบิล
+              <a href="/web/members/{{ member.id }}#billing">จัดการที่อยู่บิล →</a>
+            </div>
           </div>
         </div>
 

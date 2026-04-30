@@ -108,22 +108,37 @@
           </div>
         </div>
 
-        {# ── แก้ไขที่อยู่สำหรับบริษัทที่มีอยู่แล้ว ── #}
+        {# ── เลือก / กรอกที่อยู่สำหรับบริษัทที่มีอยู่แล้ว ── #}
         <div id="existingCoPanel" class="card border-info border-opacity-50 p-3 mb-3" style="display:none;">
-          <p class="small fw-bold text-info mb-2"><i class="bi bi-pencil-square me-1"></i>ที่อยู่สำหรับบิลนี้ <span class="fw-normal text-muted">(แก้ไขได้เฉพาะบิลนี้)</span></p>
-          <div class="mb-2">
-            <label class="form-label small fw-bold mb-1">ที่อยู่</label>
-            <textarea name="override_address" id="overrideAddressTA" class="form-control form-control-sm" rows="2"
-                      placeholder="บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์"></textarea>
-          </div>
-          <div class="mb-2">
-            <label class="form-label small fw-bold mb-1">เบอร์โทร</label>
-            <input type="text" name="override_phone" id="overridePhoneInput" class="form-control form-control-sm"
-                   placeholder="XXX-XXX-XXXX" maxlength="12" inputmode="numeric">
-          </div>
-          <div class="form-check">
-            <input type="checkbox" class="form-check-input" name="override_save" value="1" id="override_save">
-            <label class="form-check-label small" for="override_save">บันทึกที่อยู่นี้ไปยังบริษัทด้วย</label>
+          <p class="small fw-bold text-info mb-2">
+            <i class="bi bi-geo-alt-fill me-1"></i>เลือกที่อยู่สำหรับบิลนี้
+          </p>
+          {# Hidden field: ID ของ BillingProfile ที่เลือก (ว่าง = ใช้ที่อยู่หลักของบริษัท หรือกรอกใหม่) #}
+          <input type="hidden" name="selected_bp_id" id="selectedBpId" value="">
+          {# JS จะ render radio cards ที่นี่ #}
+          <div id="addrPickerList" class="mb-2"></div>
+          {# Panel กรอกที่อยู่ใหม่ #}
+          <div id="newAddrPanel" style="display:none;" class="mt-2 border-top pt-2">
+            <div class="mb-2">
+              <label class="form-label small fw-bold mb-1">ที่อยู่ใหม่ <span class="text-danger">*</span></label>
+              <textarea name="new_addr_text" id="newAddrText" class="form-control form-control-sm" rows="2"
+                        placeholder="บ้านเลขที่ ถนน แขวง เขต จังหวัด รหัสไปรษณีย์"></textarea>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-bold mb-1">เบอร์โทร</label>
+              <input type="text" name="new_addr_phone" id="newAddrPhone" class="form-control form-control-sm"
+                     placeholder="XXX-XXX-XXXX" maxlength="12" inputmode="numeric">
+            </div>
+            <div class="form-check mb-1">
+              <input type="checkbox" class="form-check-input" name="new_addr_save" value="1"
+                     id="newAddrSave" onchange="document.getElementById('newAddrLabelRow').style.display=this.checked?'':'none'">
+              <label class="form-check-label small" for="newAddrSave">บันทึกที่อยู่นี้ไว้ถาวร</label>
+            </div>
+            <div id="newAddrLabelRow" style="display:none;" class="mb-1">
+              <label class="form-label small fw-bold mb-1">ชื่อ / ป้ายกำกับที่อยู่นี้</label>
+              <input type="text" name="new_addr_label" id="newAddrLabel" class="form-control form-control-sm"
+                     placeholder="เช่น สำนักงานใหญ่, สาขา 2">
+            </div>
           </div>
         </div>
 
@@ -304,6 +319,9 @@ document.querySelectorAll('.quick-add').forEach(btn => {
   });
 });
 
+// Per-company BillingProfile data (injected from backend)
+const CO_ADDRESSES = {{ company_bps_json }};
+
 // Custom searchable company dropdown
 (function () {
   const searchInput = document.getElementById('coSearchInput');
@@ -323,6 +341,71 @@ document.querySelectorAll('.quick-add').forEach(btn => {
     });
   }
 
+  // Render address picker radio cards inside #addrPickerList
+  function renderAddressPicker(coValue) {
+    var bps   = CO_ADDRESSES[coValue] || [];
+    var list  = document.getElementById('addrPickerList');
+    var nPanel= document.getElementById('newAddrPanel');
+    var selBp = document.getElementById('selectedBpId');
+    list.innerHTML = '';
+    selBp.value = '';
+    document.getElementById('newAddrText').value  = '';
+    document.getElementById('newAddrPhone').value = '';
+    document.getElementById('newAddrSave').checked = false;
+    document.getElementById('newAddrLabelRow').style.display = 'none';
+    nPanel.style.display = 'none';
+
+    if (bps.length === 0) {
+      // No saved addresses → open new address panel straight away
+      nPanel.style.display = '';
+      return;
+    }
+
+    // Render radio cards for each BillingProfile
+    bps.forEach(function(bp, idx) {
+      var rid  = 'addrRadio_' + idx;
+      var card = document.createElement('div');
+      card.className = 'form-check mb-2 border rounded p-2';
+      var preview = bp.address ? bp.address.substring(0, 60) + (bp.address.length > 60 ? '…' : '') : '(ไม่มีที่อยู่)';
+      card.innerHTML =
+        '<input class="form-check-input me-2" type="radio" name="_addrPick" id="' + rid + '" value="' + bp.id + '"' + (bp.is_default || idx === 0 ? ' checked' : '') + '>' +
+        '<label class="form-check-label w-100" for="' + rid + '" style="cursor:pointer;">' +
+          '<span class="fw-bold small">' + (bp.label || bp.company_name || 'ที่อยู่ ' + (idx+1)) + '</span>' +
+          (bp.is_default ? '<span class="badge bg-primary ms-1" style="font-size:.6rem;">หลัก</span>' : '') +
+          '<br><span class="text-muted small">' + preview + '</span>' +
+        '</label>';
+      list.appendChild(card);
+      card.querySelector('input[type=radio]').addEventListener('change', function() {
+        selBp.value = bp.id;
+        nPanel.style.display = 'none';
+      });
+      // Pre-select default/first
+      if (bp.is_default || idx === 0) { selBp.value = bp.id; }
+    });
+
+    // "New / one-time address" option
+    var newCard = document.createElement('div');
+    newCard.className = 'form-check mb-1 border rounded p-2 border-secondary border-opacity-50';
+    var newRid = 'addrRadio_new';
+    newCard.innerHTML =
+      '<input class="form-check-input me-2" type="radio" name="_addrPick" id="' + newRid + '" value="__new__">' +
+      '<label class="form-check-label" for="' + newRid + '" style="cursor:pointer;">' +
+        '<span class="small text-secondary"><i class="bi bi-plus-circle me-1"></i>กรอกที่อยู่ใหม่ / ครั้งเดียว</span>' +
+      '</label>';
+    list.appendChild(newCard);
+    newCard.querySelector('input[type=radio]').addEventListener('change', function() {
+      selBp.value = '';
+      nPanel.style.display = '';
+      document.getElementById('newAddrText').focus();
+    });
+  }
+
+  function showExistingPanel(coValue) {
+    document.getElementById('existingCoPanel').style.display = 'block';
+    document.getElementById('newCoPanel').style.display = 'none';
+    renderAddressPicker(coValue);
+  }
+
   searchInput.addEventListener('focus', openDrop);
   searchInput.addEventListener('input', function () {
     openDrop();
@@ -334,19 +417,9 @@ document.querySelectorAll('.quick-add').forEach(btn => {
     }
   });
 
-  function showExistingPanel(opt) {
-    var addr  = opt.dataset.address  || '';
-    var phone = opt.dataset.phone    || '';
-    document.getElementById('overrideAddressTA').value   = addr;
-    document.getElementById('overridePhoneInput').value  = phone;
-    document.getElementById('override_save').checked     = false;
-    document.getElementById('existingCoPanel').style.display = 'block';
-    document.getElementById('newCoPanel').style.display = 'none';
-  }
-
   opts.forEach(function(opt) {
     opt.addEventListener('mousedown', function(e) {
-      e.preventDefault(); // prevent blur before click registers
+      e.preventDefault();
       var v = this.dataset.value;
       hidden.value = v;
       var newPanel = document.getElementById('newCoPanel');
@@ -364,7 +437,7 @@ document.querySelectorAll('.quick-add').forEach(btn => {
         closeDrop();
       } else {
         searchInput.value = this.dataset.label;
-        showExistingPanel(this);
+        showExistingPanel(v);
         closeDrop();
       }
     });
@@ -396,7 +469,7 @@ document.querySelectorAll('.quick-add').forEach(btn => {
   }
   document.getElementById('new_company_tax_id').addEventListener('input', function(){ this.value = fmtTax(this.value); });
   document.getElementById('new_company_phone').addEventListener('input', function(){ this.value = fmtPhone(this.value); });
-  document.getElementById('overridePhoneInput').addEventListener('input', function(){ this.value = fmtPhone(this.value); });
+  document.getElementById('newAddrPhone').addEventListener('input', function(){ this.value = fmtPhone(this.value); });
   document.getElementById('licensePlateInput').addEventListener('blur', function(){ this.value = this.value.toUpperCase(); });
 })();
 

@@ -220,16 +220,35 @@
 {% endif %}
 
 <!-- ที่อยู่สำหรับออกบิล -->
-<div class="mt-4">
+<div class="mt-4" id="billing">
   <div class="d-flex align-items-center mb-3">
     <h6 class="fw-bold mb-0 text-muted text-uppercase small">
       <i class="bi bi-geo-alt me-1"></i>ที่อยู่สำหรับออกบิล / ใบกำกับภาษี
+      <span class="badge bg-secondary ms-1 fw-normal" style="font-size:.65rem;">{{ billing_profiles | length }} ที่อยู่</span>
     </h6>
     <button class="btn btn-outline-primary btn-sm ms-auto"
             data-bs-toggle="collapse" data-bs-target="#addAddressForm">
       <i class="bi bi-plus-circle me-1"></i>เพิ่มที่อยู่
     </button>
   </div>
+
+  {# Banner: มีที่อยู่หลักแต่ยังไม่มี billing profile เลย #}
+  {% if member.address and billing_profiles | length == 0 %}
+  <div class="alert alert-info py-2 small d-flex align-items-center gap-2 mb-3">
+    <i class="bi bi-info-circle-fill flex-shrink-0"></i>
+    <span>ที่อยู่หลักยังไม่ได้บันทึกเป็น "ที่อยู่สำหรับออกบิล" — เพิ่มได้เลยด้านล่าง หรือกด</span>
+    <form method="post" action="/web/members/{{ member.id }}/billing-profiles" class="d-inline">
+      <input type="hidden" name="label"        value="{{ member.company_name or member.name }}">
+      <input type="hidden" name="company_name" value="{{ member.company_name or member.name }}">
+      <input type="hidden" name="tax_id"       value="{{ member.tax_id or '' }}">
+      <input type="hidden" name="address"      value="{{ member.address }}">
+      <input type="hidden" name="phone"        value="{{ member.phone or '' }}">
+      <input type="hidden" name="email"        value="{{ member.email or '' }}">
+      <input type="hidden" name="is_default"   value="1">
+      <button type="submit" class="btn btn-info btn-sm py-0 px-2">นำเข้าที่อยู่หลัก</button>
+    </form>
+  </div>
+  {% endif %}
 
   <!-- ฟอร์มเพิ่มที่อยู่ (collapse) -->
   <div class="collapse mb-3" id="addAddressForm">
